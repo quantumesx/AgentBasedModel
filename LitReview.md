@@ -1,7 +1,6 @@
 # Annotated Bibliography
 
 
-
 ### Marocco, D., & Nolfi, S. (2007)
 Main experiment the current project builds on.  
 Specs:
@@ -29,7 +28,8 @@ Specs:
       - 2 motor units
       - 1 communication unit (range: [0.0~1.0])
     - internal neurons
-      - 2 interal neurons
+      - 2 internal neurons
+        - * why these internal neurons?
 - Trial
   - 4 robots with identical controllers
   - random start position and orientation, outside of target areas

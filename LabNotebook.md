@@ -46,31 +46,46 @@ Model:
 ## Feb. 21
 
 Today:
+- NA
 
 Tomorrow:
+- Start coding
 
 
 ## Feb. 22
 
 Today:
+- Initial diagrams for modules for the code
 
 Tomorrow:
+- Specs for Marocoo & Nolfi, 2007 experiment
 
 ## Feb. 23
 
 Today:
+- Re-read Marocoo & Nolfi, 2007
 
 Tomorrow:
+- Specs for Marocoo & Nolfi, 2007 experiment
 
 ## Feb. 24
 
 Today:
 - Specs for Marocoo & Nolfi, 2007 experiment
-- Model with multiple agents, no selection
+- Figure out how to use matplotlib for animation
+- Setup github repo, venv,
 
 Tomorrow:
+- Build model with 1 agent
+- Generate animation for trial
 
 ## Feb. 25
+Today:
+- Build model with 1 agent
+
+Tomorrow:
+- Build model with multiple agents
+- generate animation for trials
 
 ## Feb. 26
 
