@@ -98,6 +98,26 @@ Tomorrow:
 ## Mar. 2
 
 ## Mar. 3
+Today:
+- write environment class
+- write sensor classes
+  - IR Sensors
+  - Ground Sensors
+  - comm. self sensor
+  - comm. other sensor
+- write actuator classes
+  - comm. sensor
+  - wheels (simple version)
+- Debug angle problem
+
+Tomorrow:
+- write controller (with a fixed pre-built network)
+- write agent class (assuming a one-agent environment atm)
+  - perception
+  - computation
+  - action
+  - updating loc
+
 
 ## Mar. 4
 
