@@ -120,7 +120,21 @@ Tomorrow:
 
 
 ## Mar. 4
+Today:
+- completed ang related functions
+
+Tomorrow:
+- get 1 agent model to work...
 
 ## Mar. 5
+Today:
+- wrote controller
+- wrote agent
+- wrote sensors
+- prepared for presentation
+
+Tomorrow:
+- write trial function animate function
+
 
 ## Mar. 6

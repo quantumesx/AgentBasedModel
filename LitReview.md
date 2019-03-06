@@ -18,9 +18,9 @@ Specs:
       - time constants
     - sensors (14 in total)
       - 8 infrared sensors
-        - * how are they placed?
+        - * how are they placed?V
       - 1 ground sensor
-        - * how are they placed?
+        - * how are they placed?V
       - 4 communication sensors
         - each encode intensity of signals produced by robots located within 100 cm distance from a orthogonal direction (frontal, rear, left, right; each include 90 degrees)
       - 1 communication sensors for comm. state at t-1
