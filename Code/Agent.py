@@ -2,9 +2,10 @@
 
 import random as rd
 from Controller import controller
-from Helper import find_dx, find_dy, find_loc, norm_ang
+from Helper import find_dx, find_dy, find_loc, find_ang, norm_ang, get_distance
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow, Wedge, Ellipse, Rectangle
+import math
 
 
 class agent():
@@ -54,7 +55,7 @@ class agent():
         self.right_output = 0
         self.comm_output = 0
 
-    def get_ground_reading(self, targets):
+    def get_ground_reading(self, env):
         """
         Get current sensor reading.
 
@@ -62,15 +63,16 @@ class agent():
         Calculation:
 
         Input:
-        - target_loc
-        - target_r
+        - env: for target_loc and target_r
         - self.loc
 
-        Validated: 03/05/19
+        Action:
+        - update self.ground_reading
+
         """
         in_target = False
         reading = 0
-        for target in targets:
+        for target in env.targets:
             # print('target:', target)
             # print('self:', self.loc)
             x_delta = self.loc[0] - target[0][0]  # difference on the x axis
@@ -90,57 +92,236 @@ class agent():
 
         self.ground_reading = reading
 
-    def get_ir_loc(agent_loc, agent_ang, ir_ang):
+    def get_comm_readings(self, agents):
         """
-        Get location of an IR sensor.
+        Get comm sensor readings.
 
-        Given agent loc, agent ang and ir ang relative to agent,
-        find ir loc and ang.
+        Inputs:
+        - position of the agent
+        - position of all other agents
+        - range of the 4 comm sensors
+
+        Output:
+        - list, reading of the 4 comm sensors
         """
-        ang = norm_ang(ir_ang+agent_ang)
-        loc = find_loc(agent_loc, ang, 10)  # 10: distance from agent's center
-        return loc, ang
+        comm_sensors = self.comm_sensors
 
-    def get_ir_reading(self, ir_range=10):
+        received = [
+            [0],
+            [0],
+            [0],
+            [0]
+        ]
+        for agent in agents:
+            # first, check if an agent is within range
+            d = get_distance(self.loc, agent.loc)
+            if d <= 100:  # if this is true, then it's within range
+                # get the signal
+                signal = agent.comm_output
+
+                # determine which comm sensor receives the signal
+                diff = norm_ang(find_ang(self.loc, agent.loc) - self.ang)
+
+                if diff >= comm_sensors[0][0] or diff < comm_sensors[0][1]:
+                    received[0].append(signal)
+                elif diff >= comm_sensors[1][0] and diff < comm_sensors[1][1]:
+                    received[1].append(signal)
+                elif diff >= comm_sensors[2][0] and diff < comm_sensors[2][1]:
+                    received[2].append(signal)
+                elif diff >= comm_sensors[3][0] and diff < comm_sensors[3][1]:
+                    received[3].append(signal)
+
+        return max(received[0]), max(received[1]), \
+            max(received[2]), max(received[3])
+
+    def get_ir_readings(self, env):
+        """Get readings for all IR sensors."""
+        self.ir_readings = []
+
+        # iterate through all ir sensors
+        for i in range(len(self.ir_placement)):
+            # first get loc and ang for the ir sensor
+            placement_ang = norm_ang(self.ir_placement[i]+self.ang)
+            # self.r-0.3 is default distance for IR sensor from center of body
+            ir_loc = find_loc(self.loc, placement_ang, self.r-0.3)
+            ir_ang = norm_ang(self.ir_ang[i]+self.ang)
+
+            # get current reading for the ir sensor
+            reading = self.ir_read(ir_loc, ir_ang, env)
+
+            # update reading in the agent
+            self.ir_readings.append(reading)
+
+    def ir_read(ir_loc, ir_ang, env, ir_range=5):
         """
-        Get reading in response to obstacle, including wall and other agents.
+        Get the reading for an IR sensor.
 
-        The closer the distance, the higher the reading.
-        Method:
-        - 1. check for wall (write this first)
-            - find intersect with the wall it's facing
-            - check if distance is less than ir_range
-            - right now, linear scaling
-        - 2. check for other agents
-            - for each of the other agents, check if center is within range
-            - if so, check distance
+        Inputs:
+        - ir_loc: ir location, xy
+        - ir_ang: ir angle
+        - ir_range: default is 5 cm
+        - env: environment; get width, height and agent attributes from it
+
+        Output:
+        - reading: float, sensor reading intensity, between 0 - 1
         """
-        for i in range(len(self.ir_angs)):
-            ir_loc = get_ir_loc(self.loc, self.ang, self.ir_angs[i])
-            loc = ir_loc[0]
-            ang = ir_loc[1]
-            # print(ir_loc)
-            # check for wall
-            tip = find_loc(loc, ang, ir_range)
-            if tip[0] <= 0:
-                distance = loc[0]/abs(tip[0]-loc[0])
-                # print(loc[0], tip[0], distance)
-            elif tip[1] <= 0:
-                distance = loc[1]/abs(tip[1]-loc[1])
-                # print(loc[1], tip[1], distance)
-            else:
-                distance = 1
+        reading = 0
 
-            # print(distance)
+        # check wall
+        distance_wall = []
 
-            wall_reading = 1-distance
+        range_max = find_loc(ir_loc, ir_ang, ir_range)
 
-            # check for agent
-            # for a in agents:
-            # distance = agents.loc[0]**2
+        # 1st quadrant
+        if ir_ang >= 0 and ir_ang < 90:
+            # if this is true, then wall is detected
+            if range_max[0] > env.width or range_max[1] > env.height:
+                # if hitting wall via x axis
+                if range_max[0] > env.width:
+                    print('1st, x')
+                    side_a = env.width - ir_loc[0]
+                    ang_a = 90 - ir_ang
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    print('x diff:', side_a)
+                    print('ang:', ang_a, 'distance:', d)
+                    distance_wall.append(d)
+                # if hitting wall via y axis
+                if range_max[1] > env.height:
+                    print('1st, y')
+                    side_a = env.height - ir_loc[1]
+                    ang_a = ir_ang
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    print('y diff:', side_a)
+                    print('ang:', ang_a, 'distance:', d)
+                    distance_wall.append(d)
 
-            reading = wall_reading
-            self.ir_readings[i] = reading
+        # 2nd quadrant
+        elif ir_ang >= 90 and ir_ang < 180:
+            # if this is true, then wall is detected
+            if range_max[0] < 0 or range_max[1] > env.height:
+                # if hitting wall via x axis
+                if range_max[0] < 0:
+                    print('2nd, x')
+                    side_a = ir_loc[0]
+                    ang_a = ir_ang - 90
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    distance_wall.append(d)
+                # if hitting wall via y axis
+                if range_max[1] > env.height:
+                    print('2nd, y')
+                    side_a = env.height - ir_loc[1]
+                    ang_a = 180 - ir_ang
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    distance_wall.append(d)
+
+        # 3rd quadrant
+        elif ir_ang >= 180 and ir_ang < 270:
+            # if this is true, then wall is detected
+            if range_max[0] < 0 or range_max[1] < 0:
+                # if hitting wall via x axis
+                if range_max[0] < 0:
+                    print('3rd, x')
+                    side_a = ir_loc[0]
+                    ang_a = 270 - ir_ang
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    distance_wall.append(d)
+                # if hitting wall via y axis
+                if range_max[1] < 0:
+                    print('3rd, y')
+                    side_a = ir_loc[1]
+                    ang_a = ir_ang - 180
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    distance_wall.append(d)
+
+        # 4th quadrant
+        elif ir_ang >= 270 and ir_ang < 360:
+            # if this is true, then wall is detected
+            if range_max[0] > env.width or range_max[1] < 0:
+                # if hitting wall via x axis
+                if range_max[0] > env.width:
+                    print('4th, x')
+                    side_a = env.width - ir_loc[0]
+                    ang_a = ir_ang - 270
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    distance_wall.append(d)
+                # if hitting wall via x axis
+                if range_max[1] < 0:
+                    print('4th, y')
+                    side_a = ir_loc[1]
+                    ang_a = 360 - ir_ang
+                    d = side_a * math.sin(math.radians(90)) / \
+                        math.sin(math.radians(ang_a))
+                    distance_wall.append(d)
+
+        # detect agents
+        distance_agents = []
+        # iterate over each agent in the environment
+        for a in env.agents:
+            overlap = False
+            detect = False
+
+            # Step 1. Detection range overlap with agent?
+            distance = get_distance(ir_loc, agent.loc)
+            if distance < ir_range + agent.r:
+                overlap = True
+                print('\noverlap:', overlap)
+
+            # Step 2. Check if agent at detectable angle
+            if overlap:
+                ir_agent_ang = find_ang(ir_loc, agent.loc)
+                diff = abs(ir_ang-ir_agent_ang)
+                # if the angle is greater than 180, take the complementary
+                if diff > 180:
+                    diff = 360 - diff
+
+                if diff >= 90:
+                    # pointed away, would not be able to detect the agent
+                    print('pointed away')
+                else:
+                    side = get_distance(ir_loc, agent.loc)
+                    # print('side:', side)
+                    closest = side * math.sin(math.radians(diff)) / \
+                        math.sin(math.radians(90))
+                    # print(closest, agent_r)
+                    if closest < agent.r:
+                        print('detectable')
+                        detect = True
+                    else:
+                        print('not close enough')
+
+            if detect:
+                possible_distance = []
+
+                side_c = side
+                side_a = agent.r
+                ang_a = diff
+
+                sin_c = side_c * (math.sin(math.radians(ang_a)) / agent.r)
+                ang_c = math.degrees(math.asin(sin_c))
+
+                for c in [ang_c, 180-ang_c]:
+                    ang_b = 180 - (180-c) - ang_a
+                    # print(ang_b, '\n')
+                    side_b = math.sin(math.radians(ang_b)) * \
+                        (side_a / math.sin(math.radians(ang_a)))
+                    # print(side_b, '\n')
+                    possible_distance.append(side_b)
+
+                distance_agents.append(min(possible_distance))
+
+        # review detection results
+        distance = distance_wall + distance_agents
+        if distance:
+            reading = 1 - (ir_range - min(distance)) / ir_range
+
+        return reading
 
     def get_output(self):
         """Feed input into the ann controller."""
@@ -151,10 +332,6 @@ class agent():
         self.left_output = self.ann.output[0]
         self.right_output = self.ann.output[1]
         self.comm_output = self.ann.output[2]
-
-    def get_comm_reading(self):
-        """Get reading for the comm. sensors."""
-        pass
 
     def update_loc(self):
         """
