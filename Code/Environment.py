@@ -37,9 +37,9 @@ class environment():
         """
         self.targets.append([target_loc, target_r])
 
-    def show(self, verbose=False):
+    def show(self, width=270, height=270, verbose=False):
         """Plot out the current environment (including targets and agents)."""
-        ax = plt.axes(xlim=(0, self.width), ylim=(0, self.height))
+        ax = plt.axes(xlim=(0, width), ylim=(0, height))
         line, = ax.plot([], [])
 
         patches = self.get_patches(verbose)

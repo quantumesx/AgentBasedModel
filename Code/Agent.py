@@ -18,7 +18,7 @@ class agent():
                  ir_placement=[60, 36, 12, -12, -36, -60, -156, 156],
                  comm_sensors=[(315, 44), (45, 134), (135, 224), (225, 314)],
                  ann=controller(i=14, h=8, o=3),  # input, hidden, output #
-                 ):
+                 name='nameless_agent'):
         """
         Initialize the environment.
 
@@ -27,6 +27,8 @@ class agent():
         """
         super().__init__()
 
+        # name
+        self.name = name
         # fixed parameters
         self.r = 2.6
 
@@ -45,7 +47,7 @@ class agent():
 
         # set comm_others
         self.comm_sensors = comm_sensors
-        self.comm_reading = [0]*len(comm_sensors)
+        self.comm_readings = [0]*len(comm_sensors)
 
         # controller
         self.ann = ann
@@ -92,7 +94,7 @@ class agent():
 
         self.ground_reading = reading
 
-    def get_comm_readings(self, agents):
+    def get_comm_readings(self, env, verbose=False):
         """
         Get comm sensor readings.
 
@@ -104,7 +106,9 @@ class agent():
         Output:
         - list, reading of the 4 comm sensors
         """
-        comm_sensors = self.comm_sensors
+        self.comm_readings = []
+
+        comm = self.comm_sensors
 
         received = [
             [0],
@@ -112,47 +116,67 @@ class agent():
             [0],
             [0]
         ]
-        for agent in agents:
+        for agent in env.agents:
             # first, check if an agent is within range
-            d = get_distance(self.loc, agent.loc)
-            if d <= 100:  # if this is true, then it's within range
-                # get the signal
-                signal = agent.comm_output
+            if agent.name == self.name:
+                pass
+            else:
+                if verbose:
+                    print('current agent:', agent.name)
+                d = get_distance(self.loc, agent.loc)
+                if d <= 100:  # if this is true, then it's within range
+                    # get the signal
+                    signal = agent.comm_output
+                    if verbose:
+                        print('perceived signal:', signal)
+                    # determine which comm sensor receives the signal
+                    diff = norm_ang(find_ang(self.loc, agent.loc) - self.ang)
 
-                # determine which comm sensor receives the signal
-                diff = norm_ang(find_ang(self.loc, agent.loc) - self.ang)
+                    if diff >= comm[0][0] or diff < comm[0][1]:
+                        received[0].append(signal)
+                        if verbose:
+                            print('received by front sensor')
+                    elif diff >= comm[1][0] and diff < comm[1][1]:
+                        received[1].append(signal)
+                        if verbose:
+                            print('received by left sensor')
+                    elif diff >= comm[2][0] and diff < comm[2][1]:
+                        received[2].append(signal)
+                        if verbose:
+                            print('received by rear sensor')
+                    elif diff >= comm[3][0] and diff < comm[3][1]:
+                        received[3].append(signal)
+                        if verbose:
+                            print('received by right sensor')
+                else:
+                    if verbose:
+                        print('out of detectable range')
 
-                if diff >= comm_sensors[0][0] or diff < comm_sensors[0][1]:
-                    received[0].append(signal)
-                elif diff >= comm_sensors[1][0] and diff < comm_sensors[1][1]:
-                    received[1].append(signal)
-                elif diff >= comm_sensors[2][0] and diff < comm_sensors[2][1]:
-                    received[2].append(signal)
-                elif diff >= comm_sensors[3][0] and diff < comm_sensors[3][1]:
-                    received[3].append(signal)
-
-        return max(received[0]), max(received[1]), \
+        self.comm_readings = max(received[0]), max(received[1]), \
             max(received[2]), max(received[3])
 
-    def get_ir_readings(self, env):
+    def get_ir_readings(self, env, verbose=False):
         """Get readings for all IR sensors."""
         self.ir_readings = []
 
         # iterate through all ir sensors
         for i in range(len(self.ir_placement)):
+
             # first get loc and ang for the ir sensor
             placement_ang = norm_ang(self.ir_placement[i]+self.ang)
             # self.r-0.3 is default distance for IR sensor from center of body
             ir_loc = find_loc(self.loc, placement_ang, self.r-0.3)
             ir_ang = norm_ang(self.ir_ang[i]+self.ang)
+            if verbose:
+                print('\ncurrent sensor:', i)
+                print('sensor position:', ir_loc, ir_ang)
 
-            # get current reading for the ir sensor
-            reading = self.ir_read(ir_loc, ir_ang, env)
+            reading = self.ir_read(ir_loc, ir_ang, env, verbose)
 
             # update reading in the agent
             self.ir_readings.append(reading)
 
-    def ir_read(ir_loc, ir_ang, env, ir_range=5):
+    def ir_read(self, ir_loc, ir_ang, env, verbose=True, ir_range=5):
         """
         Get the reading for an IR sensor.
 
@@ -178,23 +202,25 @@ class agent():
             if range_max[0] > env.width or range_max[1] > env.height:
                 # if hitting wall via x axis
                 if range_max[0] > env.width:
-                    print('1st, x')
+                    if verbose:
+                        print('wall detected: 1st quadrant, x')
                     side_a = env.width - ir_loc[0]
                     ang_a = 90 - ir_ang
                     d = side_a * math.sin(math.radians(90)) / \
                         math.sin(math.radians(ang_a))
-                    print('x diff:', side_a)
-                    print('ang:', ang_a, 'distance:', d)
+                    # print('x diff:', side_a)
+                    # print('ang:', ang_a, 'distance:', d)
                     distance_wall.append(d)
                 # if hitting wall via y axis
                 if range_max[1] > env.height:
-                    print('1st, y')
+                    if verbose:
+                        print('wall detected: 1st quadrant, y')
                     side_a = env.height - ir_loc[1]
                     ang_a = ir_ang
                     d = side_a * math.sin(math.radians(90)) / \
                         math.sin(math.radians(ang_a))
-                    print('y diff:', side_a)
-                    print('ang:', ang_a, 'distance:', d)
+                    # print('y diff:', side_a)
+                    # print('ang:', ang_a, 'distance:', d)
                     distance_wall.append(d)
 
         # 2nd quadrant
@@ -203,7 +229,8 @@ class agent():
             if range_max[0] < 0 or range_max[1] > env.height:
                 # if hitting wall via x axis
                 if range_max[0] < 0:
-                    print('2nd, x')
+                    if verbose:
+                        print('wall detected: 2nd quadrant, x')
                     side_a = ir_loc[0]
                     ang_a = ir_ang - 90
                     d = side_a * math.sin(math.radians(90)) / \
@@ -211,7 +238,8 @@ class agent():
                     distance_wall.append(d)
                 # if hitting wall via y axis
                 if range_max[1] > env.height:
-                    print('2nd, y')
+                    if verbose:
+                        print('wall detected: 2nd quadrant, y')
                     side_a = env.height - ir_loc[1]
                     ang_a = 180 - ir_ang
                     d = side_a * math.sin(math.radians(90)) / \
@@ -224,7 +252,8 @@ class agent():
             if range_max[0] < 0 or range_max[1] < 0:
                 # if hitting wall via x axis
                 if range_max[0] < 0:
-                    print('3rd, x')
+                    if verbose:
+                        print('wall detected: 3rd quadrant, x')
                     side_a = ir_loc[0]
                     ang_a = 270 - ir_ang
                     d = side_a * math.sin(math.radians(90)) / \
@@ -232,7 +261,8 @@ class agent():
                     distance_wall.append(d)
                 # if hitting wall via y axis
                 if range_max[1] < 0:
-                    print('3rd, y')
+                    if verbose:
+                        print('wall detected: 3rd quadrant, y')
                     side_a = ir_loc[1]
                     ang_a = ir_ang - 180
                     d = side_a * math.sin(math.radians(90)) / \
@@ -245,7 +275,8 @@ class agent():
             if range_max[0] > env.width or range_max[1] < 0:
                 # if hitting wall via x axis
                 if range_max[0] > env.width:
-                    print('4th, x')
+                    if verbose:
+                        print('wall detected: 4th quadrant, x')
                     side_a = env.width - ir_loc[0]
                     ang_a = ir_ang - 270
                     d = side_a * math.sin(math.radians(90)) / \
@@ -253,7 +284,8 @@ class agent():
                     distance_wall.append(d)
                 # if hitting wall via x axis
                 if range_max[1] < 0:
-                    print('4th, y')
+                    if verbose:
+                        print('wall detected: 4th quadrant, y')
                     side_a = ir_loc[1]
                     ang_a = 360 - ir_ang
                     d = side_a * math.sin(math.radians(90)) / \
@@ -263,64 +295,102 @@ class agent():
         # detect agents
         distance_agents = []
         # iterate over each agent in the environment
-        for a in env.agents:
-            overlap = False
-            detect = False
+        for agent in env.agents:
+            if agent.name == self.name:
+                pass
+            else:
+                if verbose:
+                    print('\ncurrent agent:', agent.name)
 
-            # Step 1. Detection range overlap with agent?
-            distance = get_distance(ir_loc, agent.loc)
-            if distance < ir_range + agent.r:
-                overlap = True
-                print('\noverlap:', overlap)
+                overlap = False
+                detect = False
 
-            # Step 2. Check if agent at detectable angle
-            if overlap:
-                ir_agent_ang = find_ang(ir_loc, agent.loc)
-                diff = abs(ir_ang-ir_agent_ang)
-                # if the angle is greater than 180, take the complementary
-                if diff > 180:
-                    diff = 360 - diff
-
-                if diff >= 90:
-                    # pointed away, would not be able to detect the agent
-                    print('pointed away')
+                # Step 1. Detection range overlap with agent?
+                distance = get_distance(ir_loc, agent.loc)
+                if distance < ir_range + agent.r:
+                    overlap = True
+                    if verbose:
+                        print('agent within detectable range')
                 else:
-                    side = get_distance(ir_loc, agent.loc)
-                    # print('side:', side)
-                    closest = side * math.sin(math.radians(diff)) / \
-                        math.sin(math.radians(90))
-                    # print(closest, agent_r)
-                    if closest < agent.r:
-                        print('detectable')
-                        detect = True
+                    if verbose:
+                        print('agent outside of detectable range')
+
+                # Step 2. Check if agent at detectable angle
+                if overlap:
+                    ir_agent_ang = find_ang(ir_loc, agent.loc)
+                    diff = abs(ir_ang-ir_agent_ang)
+                    # if the angle is greater than 180, take the complementary
+                    if diff > 180:
+                        diff = 360 - diff
+
+                    if diff >= 90:
+                        # pointed away, would not be able to detect the agent
+                        if verbose:
+                            print('no detected; pointed away')
                     else:
-                        print('not close enough')
+                        side = get_distance(ir_loc, agent.loc)
+                        # print('side:', side)
+                        closest = side * math.sin(math.radians(diff)) / \
+                            math.sin(math.radians(90))
+                        # print(closest, agent_r)
+                        if closest < agent.r:
+                            detect = True
+                        else:
+                            if verbose:
+                                print('not detected; not close enough')
 
-            if detect:
-                possible_distance = []
+                if detect:
+                    if verbose:
+                        print('agent detected')
+                    possible_distance = []
 
-                side_c = side
-                side_a = agent.r
-                ang_a = diff
+                    side_c = side
+                    side_a = agent.r
+                    ang_a = diff
 
-                sin_c = side_c * (math.sin(math.radians(ang_a)) / agent.r)
-                ang_c = math.degrees(math.asin(sin_c))
+                    sin_c = side_c * (math.sin(math.radians(ang_a)) / agent.r)
+                    ang_c = math.degrees(math.asin(sin_c))
 
-                for c in [ang_c, 180-ang_c]:
-                    ang_b = 180 - (180-c) - ang_a
-                    # print(ang_b, '\n')
-                    side_b = math.sin(math.radians(ang_b)) * \
-                        (side_a / math.sin(math.radians(ang_a)))
-                    # print(side_b, '\n')
-                    possible_distance.append(side_b)
+                    for c in [ang_c, 180-ang_c]:
+                        ang_b = 180 - (180-c) - ang_a
+                        side_b = math.sin(math.radians(ang_b)) * \
+                            (side_a / math.sin(math.radians(ang_a)))
 
-                distance_agents.append(min(possible_distance))
+                        # Side_b should not be smaller than 0
+                        # If it is, IR overlapped w/ agent
+                        # This means an error in the agent collision adjustment
+                        # Ideally, debug this.
+                        # Temporarily: treat side_b as 0; lead to max reading
+                        if side_b < 0:
+                            print("ERROR: IR overlap w/ agent")
+                            side_b = 0
+                        # side_b must be within ir_range;
+                        # otherwise it's not really detected
+                        if side_b < ir_range:
+                            possible_distance.append(side_b)
+
+                    if possible_distance:
+                        final = min(possible_distance)
+                        if verbose:
+                            print('all:', possible_distance)
+                            print('final:', final)
+                            print('')
+                        distance_agents.append(final)
+                    else:
+                        if verbose:
+                            print('False alarm, nothing detected')
 
         # review detection results
         distance = distance_wall + distance_agents
         if distance:
-            reading = 1 - (ir_range - min(distance)) / ir_range
+            reading = 1 - min(distance) / ir_range
 
+        if verbose:
+            print('\nCurrent sensor recap:')
+            print('distance_wall:', distance_wall)
+            print('distance_agents:', distance_agents)
+            print('final_reading:', reading)
+            print('\n')
         return reading
 
     def get_output(self):
