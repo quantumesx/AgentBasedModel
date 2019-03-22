@@ -25,6 +25,7 @@ class controller():
         h = number of hidden nodes
         o = number of output nodes
         """
+        super().__init__()
         # initialize nodes
         self.i = i  # number of input nodes
         self.h = h  # number of hidden nodes
@@ -109,15 +110,60 @@ class controller():
             # currently use tanh as activation function
             self.output[i] = np.tanh(sum(o_raw))
 
-    def mutate(self, rate=0.05):
+    def mutate(self, rate=0.2):
         """Mutate weight and biases in a network."""
+        # mutate input bias
         new_input_bias = []
-        new_hidden_bias = []
-        new_output_bias = []
+        for i in range(self.i):
+            if rd.uniform(0, 1) >= rate:
+                new_input_bias.append(self.input_bias[i])
+            else:
+                new_input_bias.append(rd.uniform(-1, 1))
+        self.input_bias = new_input_bias
 
+        # mutate hidden bias
+        new_hidden_bias = []
+        for i in range(self.h):
+            if rd.uniform(0, 1) >= rate:
+                new_hidden_bias.append(self.hidden_bias[i])
+            else:
+                new_hidden_bias.append(rd.uniform(-1, 1))
+        self.hidden_bias = new_hidden_bias
+
+        # mutate output bias
+        new_output_bias = []
+        for i in range(self.o):
+            if rd.uniform(0, 1) >= rate:
+                new_output_bias.append(self.output_bias[i])
+            else:
+                new_output_bias.append(rd.uniform(-1, 1))
+        self.output_bias = new_output_bias
+
+        # mutate input to hideen weights
         new_i2h_weights = []
+        for h in range(self.h):
+            weights = []
+            for i in range(self.i):
+                if rd.uniform(0, 1) >= rate:
+                    weights.append(self.i2h_weights[h][i])
+                else:
+                    weights.append(rd.uniform(-1, 1))
+            new_i2h_weights.append(weights)
+        self.i2h_weights = new_i2h_weights
+
+        # mutate hideen to output weights
         new_h2o_weights = []
-        pass
+        for o in range(self.o):
+            weights = []
+            for h in range(self.h):
+                if rd.uniform(0, 1) >= rate:
+                    weights.append(self.h2o_weights[o][h])
+                else:
+                    weights.append(rd.uniform(-1, 1))
+            new_h2o_weights.append(weights)
+        self.h2o_weights = new_h2o_weights
+
+        print('All mutated')
 
     def show(self):
         """Show network."""
@@ -133,21 +179,21 @@ class controller():
 
         x = 25
         y = 150
-        for t in self.input:
+        for t in range(self.i):
             ax.add_patch(Circle((x, y), 10, color='green'))
             i_nodes.append((x, y))
             x += 25
 
         y -= 50
         x = (max(self.i, self.h, self.o)-self.h)/2 * 25 + 25
-        for t in self.hidden:
+        for t in range(self.h):
             ax.add_patch(Circle((x, y), 10, color='purple'))
             h_nodes.append((x, y))
             x += 25
 
         y -= 50
         x = (max(self.i, self.h, self.o)-self.o)/2 * 25 + 25
-        for t in self.output:
+        for t in range(self.o):
             ax.add_patch(Circle((x, y), 10, color='blue'))
             o_nodes.append((x, y))
             x += 25
@@ -168,8 +214,3 @@ class controller():
                                         color='black',
                                         length_includes_head=True,
                                         head_width=3))
-
-
-if __name__ == '__main__':
-    ann = controller()
-    ann.show()
