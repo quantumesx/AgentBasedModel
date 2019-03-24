@@ -12,13 +12,14 @@ class agent():
     """Generate an agent."""
 
     def __init__(self,
-                 loc=(rd.uniform(20, 250), rd.uniform(20, 250)),
+                 loc=(100, 100),
                  ang=(rd.uniform(0, 360)),
                  ir_ang=[90, 45, 0, 0, -45, -90, -180, 180],
                  ir_placement=[60, 36, 12, -12, -36, -60, -156, 156],
                  comm_sensors=[(315, 44), (45, 134), (135, 224), (225, 314)],
                  ann=controller(i=14, h=8, o=3),  # input, hidden, output #
-                 name='nameless_agent'):
+                 name='nameless_agent',
+                 color=(rd.uniform(0, 1), rd.uniform(0, 1), rd.uniform(0, 1))):
         """
         Initialize the environment.
 
@@ -29,13 +30,14 @@ class agent():
 
         # name
         self.name = name
-        # fixed parameters
+
+        # radius of the body; this is a fixed parameters
         self.r = 2.6
 
         # initial position
         self.loc = loc
         self.ang = ang
-        self.color = (rd.uniform(0, 1), rd.uniform(0, 1), rd.uniform(0, 1))
+        self.color = color
 
         # set IR sensors
         self.ir_ang = ir_ang
@@ -49,6 +51,9 @@ class agent():
         self.comm_sensors = comm_sensors
         self.comm_readings = [0]*len(comm_sensors)
 
+        # set comm_self_reading
+        self.comm_self_reading = 0
+
         # controller
         self.ann = ann
 
@@ -56,6 +61,15 @@ class agent():
         self.left_output = 0
         self.right_output = 0
         self.comm_output = 0
+
+    def randomize_position(self, env):
+        """Generate a random position (loc and ang) for the agent."""
+        x = rd.uniform(self.r, env.width-self.r)
+        y = rd.uniform(self.r, env.height-self.r)
+        ang = rd.uniform(0, 360)
+
+        self.loc = x, y
+        self.ang = ang
 
     def get_ground_reading(self, env):
         """
@@ -152,8 +166,8 @@ class agent():
                     if verbose:
                         print('out of detectable range')
 
-        self.comm_readings = max(received[0]), max(received[1]), \
-            max(received[2]), max(received[3])
+        self.comm_readings = [max(received[0]), max(received[1]),
+                              max(received[2]), max(received[3])]
 
     def get_ir_readings(self, env, verbose=False):
         """Get readings for all IR sensors."""
@@ -395,35 +409,71 @@ class agent():
 
     def get_output(self):
         """Feed input into the ann controller."""
-        self.ann.input = self.ir_readings + \
-            [self.ground_reading] + self.comm_reading + \
+        self.ann.input_activation = self.ir_readings + \
+            [self.ground_reading] + self.comm_readings + \
             [self.comm_self_reading]
         self.ann.feedforward()
-        self.left_output = self.ann.output[0]
-        self.right_output = self.ann.output[1]
-        self.comm_output = self.ann.output[2]
+        self.left_output = self.ann.output_activation[0]
+        self.right_output = self.ann.output_activation[1]
+        self.comm_output = self.ann.output_activation[2]
 
-    def update_loc(self):
+    def update_loc(self, env,
+                   wheel_dist=5.2, iteration_time=0.1, verbose=False):
         """
-        Given speed of the wheel, calculate ang and displacement of agent.
+        Given speed of the wheel, get delta ang and displacement of agent.
 
-        input: network output, float between 0 - 1
+        input:
+        - self: network output for both wheels, each is float between 0 - 1
 
-        ang: current ang + modifier
-        displacement:
+        output:
+        - d: displacement of the agent
+        - ang: change in ang
         """
-        max_speed = 5
+        w = wheel_dist  # distance between the two wheels
+        u = 1 / iteration_time  # number of iterations per second
 
-        left_speed = self.left_output*max_speed
-        right_speed = self.right_output*max_speed
+        max_speed = 8
 
-        # this is really rudimentary, need to change
-        ang = (left_speed - right_speed) * 5.2
-        distance = (left_speed + right_speed)/2
+        noise_l = rd.uniform(0.9, 1.1)  # noise rate for left motor
+        noise_r = rd.uniform(0.9, 1.1)  # noise rate for right motor
 
-        # update ang
-        self.ang = norm_ang(self.ang+ang)
-        self.loc = find_loc(self.loc, self.ang, distance)
+        v_l = self.left_output * max_speed * noise_l
+        v_r = self.right_output * max_speed * noise_r
+
+        # change in ang
+        delta_rad = (v_r - v_l) / (w * u)
+        delta_ang = math.degrees(delta_rad)
+
+        # change in displace in the direction of the new ang
+        d = (v_r + v_l) / (2 * u)
+
+        if verbose:
+            print('left: velocity = {}, noise = {}'.format(v_l, noise_l))
+            print('right: velocity = {}, noise = {}'.format(v_r, noise_r))
+            print('delta_rad:', delta_rad)
+            print('delta_ang = {}, displacement = {}'.format(delta_ang, d))
+            print('')
+
+        raw_loc = find_loc(self.loc, self.ang, d)
+        loc = []
+        # make sure loc doesn't go beyond constraints of the environment
+
+        if raw_loc[0] < self.r:
+            loc.append(self.r)
+        elif raw_loc[0] > (env.width - self.r):
+            loc.append(env.width - self.r)
+        else:
+            loc.append(raw_loc[0])
+
+        if raw_loc[1] < self.r:
+            loc.append(self.r)
+        elif raw_loc[1] > (env.height - self.r):
+            loc.append(env.height - self.r)
+        else:
+            loc.append(raw_loc[1])
+
+        self.ang = norm_ang(self.ang + delta_ang)
+        self.loc = loc[0], loc[1]
 
     def show(self, verbose=False):
         """Generate visualization of the agent."""

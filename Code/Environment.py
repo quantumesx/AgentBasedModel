@@ -48,7 +48,7 @@ class environment():
 
         # add text to notate position of each agent
         for i in range(len(self.agents)):
-            ax.text(self.agents[i].loc[0]+10, self.agents[i].loc[1], str(i+1))
+            ax.text(self.agents[i].loc[0]+10, self.agents[i].loc[1], str(i))
 
         ax.set_aspect('equal')
 

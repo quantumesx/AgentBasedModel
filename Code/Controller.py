@@ -16,7 +16,8 @@ from matplotlib.patches import Circle, FancyArrow
 class controller():
     """Generate a controller."""
 
-    def __init__(self, i=14, h=8, o=3, debug=False):  # input, hiddent, output
+    def __init__(self, i=14, h=8, o=3, debug=False, random=True):
+        # i: input, h: hidden, o: output
         """
         Initialize a network.
 
@@ -31,14 +32,18 @@ class controller():
         self.h = h  # number of hidden nodes
         self.o = o  # number of output nodes
 
-        self.input_activation = [0]*i  # activation of input nodes
-        self.input_bias = [0]*i  # bias of input nodes
+        self.input_activation = [0] * i  # activation of input nodes
+        self.input_time_constant = [0] * i  # time constant for input nodes
+        self.input_activation_last = [0] * i
 
         self.hidden_activation = [0]*h  # activation of hidden nodes
         self.hidden_bias = [0]*h  # bias of hidden nodes
+        self.hidden_time_constant = [0]*h  # time constant for input nodes
+        self.hidden_activation_last = [0]*h
 
         self.output_activation = [0]*o  # activation of output nodes
         self.output_bias = [0]*o  # bias of output nodes
+        self.hidden_activation_last = [0]*o
 
         self.i2h_weights = [[0]*i]*h
         self.h2o_weights = [[0]*h]*o
@@ -54,6 +59,10 @@ class controller():
         #   [all inputs to hidden2], ...
         # ]
 
+        if random:
+            self.initialize_random_weights()
+            self.initialize_random_bias()
+
     def initialize_random_weights(self):
         """
         Initialize weights with random values.
@@ -65,14 +74,14 @@ class controller():
         for i in range(self.h):
             w = []
             for j in range(self.i):
-                w.append(rd.uniform(-1, 1))
+                w.append(rd.uniform(-5, 5))
             self.i2h_weights.append(w)
 
         self.h2o_weights = []
         for i in range(self.o):
             w = []
             for j in range(self.h):
-                w.append(rd.uniform(-1, 1))
+                w.append(rd.uniform(-5, 5))
             self.h2o_weights.append(w)
 
     def initialize_random_bias(self):
@@ -83,32 +92,37 @@ class controller():
         """
         self.input_bias = []
         for i in range(self.i):
-            self.input_bias.append(rd.uniform(-1, 1))
+            self.input_bias.append(rd.uniform(-5, 5))
 
         self.hidden_bias = []
         for i in range(self.h):
-            self.hidden_bias.append(rd.uniform(-1, 1))
+            self.hidden_bias.append(rd.uniform(-5, 5))
 
         self.output_bias = []
         for i in range(self.o):
-            self.output_bias.append(rd.uniform(-1, 1))
+            self.output_bias.append(rd.uniform(-5, 5))
 
     def feedforward(self):
         """Perform feedforward computation."""
-        for i in range(len(self.hidden)):
+        # hidden node activation
+        for i in range(self.h):
             h_raw = []
-            for j in range(len(self.input)):
-                h_raw.append(self.input[j]*self.i2h_weights[i][j])
+            for j in range(self.i):
+                activation = self.hidden_bias[i] + \
+                    self.input_activation[j] * self.i2h_weights[i][j]
+                h_raw.append(activation)
             # currently use tanh as activation function
-            self.hidden[i] = np.tanh(sum(h_raw))
+            self.hidden_activation[i] = np.tanh(sum(h_raw))
         # print(self.hidden)
 
-        for i in range(len(self.output)):
+        for i in range(self.o):
             o_raw = []
-            for j in range(len(self.hidden)):
-                o_raw.append(self.hidden[j]*self.h2o_weights[i][j])
+            for j in range(self.h):
+                activation = self.output_bias[i] + \
+                    self.hidden_activation[j] * self.h2o_weights[i][j]
+                o_raw.append(activation)
             # currently use tanh as activation function
-            self.output[i] = np.tanh(sum(o_raw))
+            self.output_activation[i] = np.tanh(sum(o_raw))
 
     def mutate(self, rate=0.2):
         """Mutate weight and biases in a network."""
