@@ -124,7 +124,7 @@ Today:
 - completed ang related functions
 
 Tomorrow:
-- get 1 agent model to work...
+- get 1 agent model to work...mostly, debug still needed
 
 ## Mar. 5
 Today:
@@ -136,5 +136,23 @@ Today:
 Tomorrow:
 - write trial function animate function
 
+## Mar. 6 - Mar. 11
+Midterm & recover from midterm...
 
-## Mar. 6
+## Mar. 12
+Today:
+- Tested running code in console, but it doesn't work as Python is not installed as a backend. In the future, write functions in python scripts but will run the experiments in jupyter notebook.
+- wrote controller class in python script
+
+## Mar. 17
+This is pretty inefficient. I don't technically need to communicate with other people what I'm doing for now. There are better ways to prioritize & build up work flow.
+
+I'm going to ditch this journal, or at least the date part of it. This is painful to read anyway.
+
+Here are the components of the thesis:
+- Introduction (longer than normal)
+- Methods
+- Results
+- Discussion
+
+Currently 
