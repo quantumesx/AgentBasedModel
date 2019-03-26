@@ -64,10 +64,22 @@ class agent():
 
     def randomize_position(self, env):
         """Generate a random position (loc and ang) for the agent."""
-        x = rd.uniform(self.r, env.width-self.r)
-        y = rd.uniform(self.r, env.height-self.r)
-        ang = rd.uniform(0, 360)
+        check = True
+        while check:
+            check = False
+            x = rd.uniform(self.r, env.width-self.r)
+            y = rd.uniform(self.r, env.height-self.r)
+            ang = rd.uniform(0, 360)
 
+            # make sure agents are outside of the target areas
+            for t in env.targets:
+                d = get_distance(t[0], (x, y))
+                max = self.r + t[1]  # robot radius + target radius
+                if d < max:
+                    check = True
+                    # if target not outside of the target
+                    # check will be come true and x, y will be regenerated
+                
         self.loc = x, y
         self.ang = ang
 

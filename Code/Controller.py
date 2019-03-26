@@ -16,7 +16,7 @@ from matplotlib.patches import Circle, FancyArrow
 class controller():
     """Generate a controller."""
 
-    def __init__(self, i=14, h=8, o=3, debug=False, random=True):
+    def __init__(self, i=14, h=2, o=3, preset='', verbose=False, random=True):
         # i: input, h: hidden, o: output
         """
         Initialize a network.
@@ -27,6 +27,7 @@ class controller():
         o = number of output nodes
         """
         super().__init__()
+
         # initialize nodes
         self.i = i  # number of input nodes
         self.h = h  # number of hidden nodes
@@ -101,6 +102,10 @@ class controller():
         self.output_bias = []
         for i in range(self.o):
             self.output_bias.append(rd.uniform(-5, 5))
+
+    def update_MnN(self):
+        """Perform network computation based on Maracoo and Nolfi (2003)."""
+        pass
 
     def feedforward(self):
         """Perform feedforward computation."""
