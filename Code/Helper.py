@@ -164,3 +164,17 @@ def get_distance(loc1, loc2):
     """
     distance = math.sqrt((loc1[0]-loc2[0])**2 + (loc1[1]-loc2[1])**2)
     return distance
+
+
+def normalize(x, in_min=0, in_max=255, out_min=-5, out_max=5):
+    """
+    Normalize a list of numbers betwen 0-255.
+
+    Right now it's really just scaling.
+    """
+    if x < in_min or x > in_max:
+        print("Error: input exceed input range")
+        raise
+    scaled_x = (x - in_min) / (in_max - in_min) * (out_max - out_min) + out_min
+
+    return scaled_x

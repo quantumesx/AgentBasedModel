@@ -11,12 +11,14 @@ import random as rd
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow
+from Helper import normalize
 
 
 class controller():
     """Generate a controller."""
 
-    def __init__(self, i=14, h=2, o=3, preset='', verbose=False, random=True):
+    def __init__(self, genome=[], i=14, h=2, o=3, preset='',
+                 verbose=False, random=False):
         # i: input, h: hidden, o: output
         """
         Initialize a network.
@@ -33,18 +35,15 @@ class controller():
         self.h = h  # number of hidden nodes
         self.o = o  # number of output nodes
 
+        self.genome = []
+
         self.input_activation = [0] * i  # activation of input nodes
-        self.input_time_constant = [0] * i  # time constant for input nodes
-        self.input_activation_last = [0] * i
 
         self.hidden_activation = [0]*h  # activation of hidden nodes
         self.hidden_bias = [0]*h  # bias of hidden nodes
-        self.hidden_time_constant = [0]*h  # time constant for input nodes
-        self.hidden_activation_last = [0]*h
 
         self.output_activation = [0]*o  # activation of output nodes
         self.output_bias = [0]*o  # bias of output nodes
-        self.hidden_activation_last = [0]*o
 
         self.i2h_weights = [[0]*i]*h
         self.h2o_weights = [[0]*h]*o
@@ -61,6 +60,12 @@ class controller():
         # ]
 
         if random:
+            self.initialize_random_weights()
+            self.initialize_random_bias()
+        elif genome:
+            self.GtoP(genome)
+        else:
+            print('No genome; weights randomly generated.')
             self.initialize_random_weights()
             self.initialize_random_bias()
 
@@ -91,10 +96,6 @@ class controller():
 
         The random values are drawn from uniform distribution (-1, 1).
         """
-        self.input_bias = []
-        for i in range(self.i):
-            self.input_bias.append(rd.uniform(-5, 5))
-
         self.hidden_bias = []
         for i in range(self.h):
             self.hidden_bias.append(rd.uniform(-5, 5))
@@ -128,6 +129,35 @@ class controller():
                 o_raw.append(activation)
             # currently use tanh as activation function
             self.output_activation[i] = np.tanh(sum(o_raw))
+
+    def GtoP(self, genome):
+        """
+        Convert genome to network metrics.
+
+        Need to update this to fit MN network.
+        """
+        n = 0
+
+        self.i2h_weights = []
+        for i in range(self.h):
+            w = []
+            for j in range(self.i):
+                w.append(normalize(genome[n]))
+                n += 1
+            self.i2h_weights.append(w)
+        print(n)
+
+        self.h2o_weights = []
+        for i in range(self.o):
+            w = []
+            for j in range(self.h):
+                w.append(normalize(genome[n]))
+                n += 1
+            self.h2o_weights.append(w)
+        print(n)
+
+        self.hidden_bias = [normalize(x) for x in genome[n:n+self.h]]
+        self.output_bias = [normalize(x) for x in genome[n+self.h:]]
 
     def mutate(self, rate=0.2):
         """Mutate weight and biases in a network."""
