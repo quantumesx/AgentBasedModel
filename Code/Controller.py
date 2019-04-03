@@ -168,31 +168,118 @@ class MN_controller():
         beginning of the operation.
         - The operation needs to be performed in the specific order as defined
         in this function.
-        
+            - step 1: get sensor activation (t) via sensor reading inputs
+              (for comm_self (t), via comm_unit (t-1))
+            - step 2: get internal nodes activation at t+1 via sensor(t)
+            - step 3: get motor activation at t+1 via internal(t) and sensor(t)
         """
+
+        # otherwise variable names are too long
+        nodes = self.nodes
+        conn = self.connections
+
+        # whether weight is considered in comm_unit - comm_self connections
+        comm_unit_weight = True
+
+        # make sure the # of inputs is correct
         if len(inputs) != self.i-1:  # this should be 13
             print('Warning: incorrect input shape')
 
-        # first update sensors
-        for n in [n for n in self.nodes.keys() if
-                  self.nodes[n]['type'] == 'sensor']:
-            if self.nodes[n]['name'] == 'comm_self':
-                pass
+        # get the id # for all the neurons
+        sensory_nodes = [n for n in nodes.keys()
+                         if nodes[n]['type'] == 'sensor']
+        internal_nodes = [n for n in nodes.keys()
+                          if nodes[n]['type'] == 'internal']
+        motor_nodes = [n for n in nodes.keys()
+                       if nodes[n]['type'] == 'motor']
+
+        # make sure the length of activations are as expected
+        a_sensor = [nodes[n]['activation'] for n in sensory_nodes]
+        len_sensor = [len(l) for l in a_sensor]
+
+        a_internal = [nodes[n]['activation'] for n in internal_nodes]
+        len_internal = [len(l) for l in a_internal]
+
+        a_motor = [nodes[n]['activation'] for n in motor_nodes]
+        len_motor = [len(l) for l in a_motor]
+
+        s_valid = max(len_sensor) == min(len_sensor)
+        i_valid = max(len_internal) == min(len_internal)
+        m_valid = max(len_motor) == min(len_motor)
+        diff_valid = (max(len_sensor) - max(len_motor) == -1)
+        eq_valid = (max(len_motor) == max(len_internal) == 0)
+        if not (s_valid and i_valid and m_valid and diff_valid and eq_valid):
+            print('Warning: the lengths are not as predicted')
+            print([len_sensor, len_internal, len_motor])
+        else:
+            print('lengths as predicted')
+
+        # Step 1: update sensors
+        for n in sensory_nodes:
+            # computation for comm_self is different than other sensors
+            if nodes[n]['name'] == 'comm_self':
+                sum_signal = 0
+                for c in conn.keys():
+                    if conn[c]['output'] == n:  # there should only be one tho
+                        if comm_unit_weight:
+                            # method 1: treat comm_unit (t-1)* weight as sensor
+                            # for internal and motors, activation at current
+                            # time step t is already calculated, so t-1 is the
+                            # second to last value.
+                            input = nodes[conn[c]['input']]['activation'][-2]
+                            weight = conn[c]['weight']
+                            sum_signal += input * weight
+                        else:
+                            # method 2: treat comm_unit as sensor (no weight)
+                            input = nodes[conn[c]['input']]['activation'][-2]
+                            sum_signal += input
+            # computation for other sensors
             else:
-                raw_signal = inputs[n]
-                activation = self.nodes[n]['activation'][-1]
+                signal = inputs[n]  # signal from the sensor inputs
+                time_const = nodes[n]['time_const']  # the node's time constant
+                activation_last = nodes[n]['activation'][-1]  # last time
+                activation = activation_last * time_const \
+                    + signal * (1 - time_const)  # sensor node activation func
                 self.nodes[n]['activation'].append(activation)
 
-        # then get
+        # Step 2: update internal nodes
+        internal_activations = []
+        for n in internal_nodes:
+            sum_signals = 0
+            for c in conn.keys():
+                if conn[c]['output'] == n:
+                    input = nodes[conn[c]['input']]['activation'][-1]
+                    weight = conn[c]['weight']
+                    sum_signals += input * weight
 
+            bias = nodes[n]['bias']
+            time_const = nodes[n]['time_const']
+            a_last = nodes[n]['activation'][-1]
+            a_raw = bias + sum_signals
 
+            # activation func for internal nodes
+            activation = a_last * time_const + \
+                ((1 + math.e ** (-a_raw)) ** -1) * (1 - time_const)
 
+            # do not activate directly; update all together at the end of func
+            internal_activations.append((n, activation))
 
-        #
+        # Step 3: update motor nodes
+        motor_activations = []
+        for n in motor_nodes:
+            sum_signals = 0
+            for c in conn.keys():
+                if conn[c]['output'] == n:
+                    input = nodes[conn[c]['input']]['activation'][-1]
+                    weight = conn[c]['weight']
+                    sum_signals += input * weight
 
+            bias = nodes[n]['bias']
+            a_raw = bias + sum_signals
+            activation = 1 / (1 + math.e ** (-a_raw))
 
-
-
+            # do not activate directly; update all together at the end of func
+            internal_activations.append((n, activation))
 
 
         for n in nodes.keys():
