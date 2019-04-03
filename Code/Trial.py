@@ -2,7 +2,7 @@
 
 from Agent import agent
 from Environment import environment
-from Controller import controller
+from Controller import MN_controller
 from Helper import find_dx, find_dy, get_distance
 
 from tqdm import tqdm
@@ -17,7 +17,7 @@ class experiment():
     def __init__(self,
                  pop=100,
                  gen=100,
-                 genome_size=39,  # need to change this
+                 genome_size=83,
                  iteration=1000,
                  time=0.1,
                  preset='M&N, 2003',
@@ -50,7 +50,7 @@ class experiment():
             for p in range(self.pop):
                 genome = self.genome[g][p]
 
-                ann = controller(self.genome)
+                ann = MN_controller(self.genome)
                 total_fit = []  # fitness of the trials
                 for i in self.trial:
                     t = trial(ann, name='g{}p{}i{}'.format(g, p, i))
@@ -145,15 +145,24 @@ class trial():
                 a.get_ground_reading(self.env)
                 a.get_ir_readings(self.env)
                 a.get_comm_readings(self.env)
-                a.comm_self_reading = a.comm_output
 
                 # then get outputs
                 # updates left_output, right_output, comm_output
                 a.get_output()
 
+                # This is technically a sensor node, but...
+                # due to the way this is implemented, it's computed in the
+                # ann controller
+                # Update after network propagation in order to save data
+                # can change this in the future
+                a.comm_self_reading = a.ann.nodes[13]['activation'][-1]
+
                 # store current sensor and actuator data
-                a.input_data.append(a.ann.input_activation)
-                a.output_data.append(a.ann.output_activation)
+                inputs = a.ir_readings + a.comm_readings + \
+                    [a.ground_reading] + [a.comm_self_reading]
+                a.input_data.append(inputs)
+                outputs = [a.left_output, a.right_output, a.comm_output]
+                a.output_data.append(outputs)
 
                 # finally, get new location
                 a.update_loc(self.env)

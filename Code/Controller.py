@@ -11,15 +11,21 @@ import random as rd
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow
+import math
+
 from Helper import normalize
 
 
 class MN_controller():
     """Generate a MN controller."""
 
-    def __init__(self, genome, i=14, h=2, o=3):
+    def __init__(self, genome=[], i=14, h=2, o=3,
+                 genome_size=83, random=False, name='nameless_controller'):
         """Initialize the network."""
         super().__init__()
+
+        # name
+        self.name = name
 
         # initialize nodes
         self.i = i  # number of input nodes
@@ -27,12 +33,24 @@ class MN_controller():
         self.o = o  # number of output nodes
 
         # genotype
-        self.genome = genome
+        if genome:
+            self.genome = genome
+        elif random:
+            genome = rd.choices(range(0, 255), k=genome_size)
+            self.genome = genome
+        else:
+            print('Error: No genome.')
 
         # phenotype
         self.nodes = self.generate_node_list()
         self.connections = self.generate_connection_list()
         self.G_to_P()  # get phenotype from genome
+
+        # initialize activations
+        for n in self.nodes.keys():
+            self.nodes[n]['activation'].append(0)
+            if self.nodes[n]['type'] != 'sensory':
+                self.nodes[n]['activation'].append(0)
 
     def generate_node_list(self):
         """Generate list of nodes for MN controller."""
@@ -145,7 +163,29 @@ class MN_controller():
             self.connections[c]['weight'] = normalize(self.genome[
                 self.connections[c]['weight_locus']])
 
-    def iterate(self, inputs):
+    def sensor_to_motor(self, inputs):
+        """
+        Get motor outputs.
+
+        Given the inputs, propagate the information, and return motor outputs.
+        """
+        # make sure the # of inputs is correct
+        if len(inputs) != self.i-1:  # this should be 13
+            print('Warning: incorrect input shape')
+
+        self.propagate(inputs)
+
+        for n in self.nodes.keys():
+            if self.nodes[n]['name'] == 'motor_left':
+                motor_left = self.nodes[n]['activation'][-1]
+            elif self.nodes[n]['name'] == 'motor_right':
+                motor_right = self.nodes[n]['activation'][-1]
+            elif self.nodes[n]['name'] == 'comm_unit':
+                comm_unit = self.nodes[n]['activation'][-1]
+
+        return motor_left, motor_right, comm_unit
+
+    def propagate(self, inputs):
         """
         Update activations in nodes.
 
@@ -173,7 +213,6 @@ class MN_controller():
             - step 2: get internal nodes activation at t+1 via sensor(t)
             - step 3: get motor activation at t+1 via internal(t) and sensor(t)
         """
-
         # otherwise variable names are too long
         nodes = self.nodes
         conn = self.connections
@@ -187,7 +226,7 @@ class MN_controller():
 
         # get the id # for all the neurons
         sensory_nodes = [n for n in nodes.keys()
-                         if nodes[n]['type'] == 'sensor']
+                         if nodes[n]['type'] == 'sensory']
         internal_nodes = [n for n in nodes.keys()
                           if nodes[n]['type'] == 'internal']
         motor_nodes = [n for n in nodes.keys()
@@ -207,18 +246,18 @@ class MN_controller():
         i_valid = max(len_internal) == min(len_internal)
         m_valid = max(len_motor) == min(len_motor)
         diff_valid = (max(len_sensor) - max(len_motor) == -1)
-        eq_valid = (max(len_motor) == max(len_internal) == 0)
+        eq_valid = (max(len_motor) == max(len_internal))
         if not (s_valid and i_valid and m_valid and diff_valid and eq_valid):
             print('Warning: the lengths are not as predicted')
             print([len_sensor, len_internal, len_motor])
-        else:
-            print('lengths as predicted')
+        # else:
+            # print('lengths as predicted')
 
         # Step 1: update sensors
         for n in sensory_nodes:
             # computation for comm_self is different than other sensors
             if nodes[n]['name'] == 'comm_self':
-                sum_signal = 0
+                signal = 0
                 for c in conn.keys():
                     if conn[c]['output'] == n:  # there should only be one tho
                         if comm_unit_weight:
@@ -228,22 +267,23 @@ class MN_controller():
                             # second to last value.
                             input = nodes[conn[c]['input']]['activation'][-2]
                             weight = conn[c]['weight']
-                            sum_signal += input * weight
+                            signal += input * weight
                         else:
                             # method 2: treat comm_unit as sensor (no weight)
                             input = nodes[conn[c]['input']]['activation'][-2]
-                            sum_signal += input
+                            signal += input
             # computation for other sensors
             else:
                 signal = inputs[n]  # signal from the sensor inputs
-                time_const = nodes[n]['time_const']  # the node's time constant
-                activation_last = nodes[n]['activation'][-1]  # last time
-                activation = activation_last * time_const \
-                    + signal * (1 - time_const)  # sensor node activation func
-                self.nodes[n]['activation'].append(activation)
+
+            time_const = nodes[n]['time_const']  # the node's time constant
+            activation_last = nodes[n]['activation'][-1]  # last time
+            activation = activation_last * time_const \
+                + signal * (1 - time_const)  # sensor node activation func
+            self.nodes[n]['activation'].append(activation)
 
         # Step 2: update internal nodes
-        internal_activations = []
+        new_activations = []
         for n in internal_nodes:
             sum_signals = 0
             for c in conn.keys():
@@ -262,10 +302,9 @@ class MN_controller():
                 ((1 + math.e ** (-a_raw)) ** -1) * (1 - time_const)
 
             # do not activate directly; update all together at the end of func
-            internal_activations.append((n, activation))
+            new_activations.append((n, activation))
 
         # Step 3: update motor nodes
-        motor_activations = []
         for n in motor_nodes:
             sum_signals = 0
             for c in conn.keys():
@@ -279,42 +318,63 @@ class MN_controller():
             activation = 1 / (1 + math.e ** (-a_raw))
 
             # do not activate directly; update all together at the end of func
-            internal_activations.append((n, activation))
+            new_activations.append((n, activation))
 
+        for n, a in new_activations:
+            nodes[n]['activation'].append(a)
 
-        for n in nodes.keys():
+    def show(self):
+        """Show network plot."""
+        ax = plt.axes(xlim=(0, max(self.i, self.h, self.o)*25 + 100),
+                      ylim=(0, 200))
+        line, = ax.plot([], [])
+        ax.set_aspect('equal')
+        ax.figure.set_size_inches(5, 2)
 
-            # get summation of activations of incoming signals
-            sum_signals = 0
+        nodes = []
 
-            for c in connections.keys():
-                # get all the connections where the current node is
-                if connections[c]['output'] == n:
-                    # add the weighted signal to raw activation
-                    sum_signals += nodes[connections[c]['input']]['activation'][i] * connections[c]['weight']
+        x = 25
+        y = 50
+        for t in range(self.i):
+            ax.add_patch(Circle((x, y), 10, color='green'))
+            nodes.append((t, x, y))
+            x += 25
 
-            # run the summation of signals through the activation function
-            if nodes[n]['type'] == 'motor':
-                bias = nodes[n]['bias']
-                activation_raw = bias + sum_signals
-                activation = 1 / 1 + math.e ** (-activation_raw)
-                nodes[n]['activation'].append(activation)
+        y += 50
+        x = max(self.i, self.h, self.o) * 25 + 25
+        for t in range(self.h):
+            ax.add_patch(Circle((x, y), 10, color='purple'))
+            nodes.append((t+self.i, x, y))
+            x += 25
 
-            elif nodes[n]['type'] == 'internal':
-                bias = nodes[n]['bias']
-                time_const = nodes[n]['time_const']
+        y += 50
+        x = (max(self.i, self.h, self.o)-self.o)/2 * 25 + 25
+        for t in range(self.o):
+            ax.add_patch(Circle((x, y), 10, color='blue'))
+            nodes.append((t+self.i+self.h, x, y))
+            x += 25
 
-                activation_raw = bias + sum_signals
-                activation = nodes[n]['activation'][i] * time_const + (1 + math.e**(-activation_raw))** -1 * (1 - time_const)
-                nodes[n]['activation'].append(activation)
+        for i in nodes:
+            for c in self.connections.keys():
+                if self.connections[c]['input'] == i[0]:
+                    out = self.connections[c]['output']
+                    j = nodes[out]
 
-            elif nodes[n]['type'] == 'sensor':
-                time_const = nodes[n]['time_const']
-                activation_raw = sum_signals
+                    color = 'gray'
+                    if self.connections[c]['weight'] < 0:
+                        color = 'blue'
+                    elif self.connections[c]['weight'] > 0:
+                        color = 'red'
+                    ax.add_patch(FancyArrow(i[1], i[2],
+                                            j[1]-i[1], j[2]-i[2],
+                                            width=0.001,
+                                            color=color,
+                                            length_includes_head=True,
+                                            head_width=5))
 
-                activation = nodes[n]['activation'][i] * time_const + sum_signals * (1 - time_const)
-                nodes[n]['activation'].append(activation)
-`
+        ax.set_aspect('equal')
+        ax.figure.set_size_inches(6, 6)
+
 
 class controller():
     """Generate a controller."""

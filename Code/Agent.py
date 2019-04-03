@@ -1,7 +1,7 @@
 """Generate an agent."""
 
 import random as rd
-from Controller import controller
+from Controller import MN_controller
 from Helper import find_dx, find_dy, find_loc, find_ang, norm_ang, get_distance
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow, Wedge, Ellipse, Rectangle
@@ -17,7 +17,8 @@ class agent():
                  ir_ang=[90, 45, 0, 0, -45, -90, -180, 180],
                  ir_placement=[60, 36, 12, -12, -36, -60, -156, 156],
                  comm_sensors=[(315, 44), (45, 134), (135, 224), (225, 314)],
-                 ann=controller(i=14, h=8, o=3),  # input, hidden, output #
+                 # input, hidden, output #
+                 ann=MN_controller(i=14, h=2, o=3, random=True),
                  name='nameless_agent',
                  color=(rd.uniform(0, 1), rd.uniform(0, 1), rd.uniform(0, 1))):
         """
@@ -79,7 +80,7 @@ class agent():
                     check = True
                     # if target not outside of the target
                     # check will be come true and x, y will be regenerated
-                
+
         self.loc = x, y
         self.ang = ang
 
@@ -421,13 +422,17 @@ class agent():
 
     def get_output(self):
         """Feed input into the ann controller."""
-        self.ann.input_activation = self.ir_readings + \
-            [self.ground_reading] + self.comm_readings + \
-            [self.comm_self_reading]
-        self.ann.feedforward()
-        self.left_output = self.ann.output_activation[0]
-        self.right_output = self.ann.output_activation[1]
-        self.comm_output = self.ann.output_activation[2]
+        # organize inputs
+        inputs = self.ann.input_activation = self.ir_readings + \
+            self.comm_readings + [self.ground_reading]
+
+        # get outputs
+        outputs = self.ann.sensor_to_motor(inputs)
+
+        # update outputs
+        self.left_output = outputs[0]
+        self.right_output = outputs[1]
+        self.comm_output = outputs[2]
 
     def update_loc(self, env,
                    wheel_dist=5.2, iteration_time=0.1, verbose=False):
