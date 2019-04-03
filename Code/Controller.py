@@ -14,6 +14,221 @@ from matplotlib.patches import Circle, FancyArrow
 from Helper import normalize
 
 
+class MN_controller():
+    """Generate a MN controller."""
+
+    def __init__(self, genome, i=14, h=2, o=3):
+        """Initialize the network."""
+        super().__init__()
+
+        # initialize nodes
+        self.i = i  # number of input nodes
+        self.h = h  # number of hidden nodes
+        self.o = o  # number of output nodes
+
+        # genotype
+        self.genome = genome
+
+        # phenotype
+        self.nodes = self.generate_node_list()
+        self.connections = self.generate_connection_list()
+        self.G_to_P()  # get phenotype from genome
+
+    def generate_node_list(self):
+        """Generate list of nodes for MN controller."""
+        nodes = {}
+        for n in range(self.i):
+            if n <= 7:
+                name = 'IR_' + str(n)
+            elif n > 7 and n <= 11:
+                name = 'comm_' + str(n-8)
+            elif n == 12:
+                name = 'ground'
+            elif n == 13:
+                name = 'comm_self'
+            else:
+                print('Error: unknown sensory neuron identity.')
+            nodes[n] = {'type': 'sensory', 'name': name, 'time_const_locus': n}
+
+        for n in range(self.h):
+            name = 'internal_' + str(n+1)
+            nodes[n+self.i] = {'type': 'internal', 'name': name,
+                               'time_const_locus': n+self.i,
+                               'bias_locus': n+self.i+self.h}
+
+        for n in range(self.o):
+            if n == 0:
+                name = 'motor_left'
+            elif n == 1:
+                name = 'motor_right'
+            elif n == 2:
+                name = 'comm_unit'
+            else:
+                print('Error: unknown motor neuron identity.')
+            nodes[n+self.i+self.h] = {'type': 'motor', 'name': name,
+                                      'bias_locus': n+self.i+self.h*2}
+        return nodes
+
+    def generate_connection_list(self):
+        """Generate list of all possible connections for MN controller."""
+        offset = self.i + self.h * 2 + self.o
+
+        connections = {}
+        n = 0
+
+        for i in self.nodes.keys():
+            # sensory nodes
+            if self.nodes[i]['type'] == 'sensory':
+                for j in self.nodes.keys():
+                    # sensor to internal
+                    if self.nodes[j]['name'] == 'internal_1':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'sensor_to_internal',
+                                          'weight_locus': n+offset}
+                        n += 1
+                    # sensor to motor
+                    if self.nodes[j]['type'] == 'motor':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'sensor_to_motor',
+                                          'weight_locus': n+offset}
+                        n += 1
+
+            # internal node 1
+            if self.nodes[i]['name'] == 'internal_1':
+                for j in self.nodes.keys():
+                    # sensor to internal
+                    if self.nodes[j]['name'] == 'internal_2':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'internal_to_internal',
+                                          'weight_locus': n+offset}
+                        n += 1
+                    # sensor to motor
+                    if self.nodes[j]['type'] == 'motor':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'internal_to_motor',
+                                          'weight_locus': n+offset}
+                        n += 1
+
+            # internal node 2
+            if self.nodes[i]['name'] == 'internal_2':
+                for j in self.nodes.keys():
+                    # sensor to internal
+                    if self.nodes[j]['name'] == 'internal_1':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'internal_to_internal',
+                                          'weight_locus': n+offset}
+                        n += 1
+
+            # comm unit to comm_self
+            if self.nodes[i]['name'] == 'comm_unit':
+                for j in self.nodes.keys():
+                    if self.nodes[j]['name'] == 'comm_self':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'motor_to_sensor',
+                                          'weight_locus': n+offset}
+                        n += 1
+
+        return connections
+
+    def G_to_P(self):
+        """Convert genome type to phenotype."""
+        for n in self.nodes.keys():
+            self.nodes[n]['activation'] = []
+            if 'time_const_locus' in self.nodes[n].keys():
+                self.nodes[n]['time_const'] = normalize(self.genome[
+                    self.nodes[n]['time_const_locus']], out_min=0, out_max=1)
+            if 'bias_locus' in self.nodes[n].keys():
+                self.nodes[n]['bias'] = normalize(self.genome[
+                    self.nodes[n]['bias_locus']])
+
+        for c in self.connections.keys():
+            self.connections[c]['weight'] = normalize(self.genome[
+                self.connections[c]['weight_locus']])
+
+    def iterate(self, inputs):
+        """
+        Update activations in nodes.
+
+        inputs:
+        - sensor inputs (expect)
+        - self: layer parameters, nodes, connections
+
+        actions:
+        - get sensor activation for the current timestep
+        - get internal neuron and motor activation for the next timestep
+        - update these activation to the self.nodes attribute
+
+        Note:
+        - This function does not take into consideration of the actual # of the
+        current timestep, and assumes that we start with activations of all
+        nodes for the last time step as well as activation for internal & motor
+        nodes for the current time step.
+        - In this case, all sensory nodes activation list should have the same
+        length, l (l>0), while other nodes should have length l+1 at the
+        beginning of the operation.
+        - The operation needs to be performed in the specific order as defined
+        in this function.
+        
+        """
+        if len(inputs) != self.i-1:  # this should be 13
+            print('Warning: incorrect input shape')
+
+        # first update sensors
+        for n in [n for n in self.nodes.keys() if
+                  self.nodes[n]['type'] == 'sensor']:
+            if self.nodes[n]['name'] == 'comm_self':
+                pass
+            else:
+                raw_signal = inputs[n]
+                activation = self.nodes[n]['activation'][-1]
+                self.nodes[n]['activation'].append(activation)
+
+        # then get
+
+
+
+
+        #
+
+
+
+
+
+
+        for n in nodes.keys():
+
+            # get summation of activations of incoming signals
+            sum_signals = 0
+
+            for c in connections.keys():
+                # get all the connections where the current node is
+                if connections[c]['output'] == n:
+                    # add the weighted signal to raw activation
+                    sum_signals += nodes[connections[c]['input']]['activation'][i] * connections[c]['weight']
+
+            # run the summation of signals through the activation function
+            if nodes[n]['type'] == 'motor':
+                bias = nodes[n]['bias']
+                activation_raw = bias + sum_signals
+                activation = 1 / 1 + math.e ** (-activation_raw)
+                nodes[n]['activation'].append(activation)
+
+            elif nodes[n]['type'] == 'internal':
+                bias = nodes[n]['bias']
+                time_const = nodes[n]['time_const']
+
+                activation_raw = bias + sum_signals
+                activation = nodes[n]['activation'][i] * time_const + (1 + math.e**(-activation_raw))** -1 * (1 - time_const)
+                nodes[n]['activation'].append(activation)
+
+            elif nodes[n]['type'] == 'sensor':
+                time_const = nodes[n]['time_const']
+                activation_raw = sum_signals
+
+                activation = nodes[n]['activation'][i] * time_const + sum_signals * (1 - time_const)
+                nodes[n]['activation'].append(activation)
+`
+
 class controller():
     """Generate a controller."""
 
