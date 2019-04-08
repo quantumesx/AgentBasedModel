@@ -3,7 +3,7 @@
 import math
 
 
-def find_ang(xy1, xy2):
+def find_ang(xy1, xy2, verbose=False):
     """
     Find orientation of the vector linking x1, y1 to x2, y2.
 
@@ -20,7 +20,8 @@ def find_ang(xy1, xy2):
     dy = y2 - y1
 
     if dx == 0 and dy == 0:
-        print('Error: the two points can not be the same')
+        if verbose:
+            print('Error: the two points can not be the same')
         return 0
 
     # 1st quadrant

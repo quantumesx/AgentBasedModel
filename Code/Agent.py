@@ -389,7 +389,8 @@ class agent():
                         # Ideally, debug this.
                         # Temporarily: treat side_b as 0; lead to max reading
                         if side_b < 0:
-                            print("ERROR: IR overlap w/ agent")
+                            if verbose:
+                                print("ERROR: IR overlap w/ agent")
                             side_b = 0
                         # side_b must be within ir_range;
                         # otherwise it's not really detected

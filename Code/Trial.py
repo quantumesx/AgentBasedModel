@@ -2,85 +2,10 @@
 
 from Agent import agent
 from Environment import environment
-from Controller import MN_controller
 from Helper import find_dx, find_dy, get_distance
 
-from tqdm import tqdm
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow
-import random as rd
-
-
-class experiment():
-    """Run an experiment."""
-
-    def __init__(self,
-                 pop=100,
-                 gen=100,
-                 genome_size=83,
-                 iteration=1000,
-                 time=0.1,
-                 preset='M&N, 2003',
-                 env_height=270, env_width=270, targets=True,
-                 trial=20
-                 ):
-        """Initialize the experiment."""
-        self.pop = pop  # population size
-        self.gen = gen  # total # of generations to run
-        self.trial = 20  # trial to run for each group in the population
-
-        self.genome_size = genome_size
-        self.genome = []  # [[g1p1, g1p2, ...], [g2p1, g2p2, ...], ...]
-        self.fitness = []  # [[g1p1, g1p2, ...], [g2p1, g2p2, ...], ...]
-        self.top = []
-
-    def run(self):
-        """Run experiment."""
-        # initialize random genome for the first generation
-        first_gen = []
-        for p in range(self.pop):
-            genome = rd.choices(range(0, 255), k=self.genome_size)
-            first_gen.append(genome)
-        self.genome.append(first_gen)
-
-        for g in range(self.gen):
-            pop_fitness = []
-
-            # run the entire population
-            for p in range(self.pop):
-                genome = self.genome[g][p]
-
-                ann = MN_controller(self.genome)
-                total_fit = []  # fitness of the trials
-                for i in self.trial:
-                    t = trial(ann, name='g{}p{}i{}'.format(g, p, i))
-                    t.run()
-                    total_fit.append(sum(t.fitness))
-                fitness = sum(total_fit) / self.trial
-                pop_fitness.append(fitness)
-
-            # update
-            self.fitness.append(pop_fitness)
-
-            # select 20 best performing teams
-            index = []
-            for i in range(self.pop):
-                index.append(self.genome[g][i], self.fitness[g][i])
-
-            def get_key(item):
-                return item[1]
-
-            top_genome = [g[0] for g in sorted(index, key=get_key,
-                                               reverse=True)[:5]]
-            self.top.append(top_genome)
-
-            # get genome for next generation
-            next_genome = []
-            for g in top_genome:
-                for i in range(self.pop/5):
-                    # need to change this
-                    next_genome.append(g)
-            self.genome
 
 
 class trial():
@@ -101,7 +26,9 @@ class trial():
         self.preset = preset  # preset name
         self.iteration = iteration  # total numbers of iterations
         self.step_time = 0.1  # time for each iteration step in seconds
-        self.fitness = []  # fitness at each timestep
+        self.step_fitness = []  # fitness at each timestep
+        self.fitness = 0  # total fitness
+
         # initialize environment
         self.env = environment(width=env_width, height=env_height,
                                targets=targets)
@@ -129,10 +56,10 @@ class trial():
         if verbose:
             self.env.show()
 
-    def run(self):
+    def run(self, record=True):
         """Run trial."""
-        self.fitness = []
-        for i in tqdm(range(self.iteration)):
+        self.step_fitness = []
+        for i in range(self.iteration):
             # iterate through agents
             for a in self.env.agents:
                 # store current location and sensor data
@@ -168,12 +95,15 @@ class trial():
                 a.update_loc(self.env)
                 # this updates loc and ang
                 # so essential to store current data before this
-            self.fitness.append(self.get_step_fitness(self.env.agents))
-        self.data = []
-        for a in self.env.agents:
-            self.data.append(
-                [a.loc_data, a.ang_data, a.input_data, a.output_data]
-            )
+            self.step_fitness.append(self.get_step_fitness(self.env.agents))
+
+        if record:
+            self.data = [[a.loc_data,
+                          a.ang_data,
+                          a.input_data,
+                          a.output_data] for a in self.env.agents]
+
+        self.fitness = sum(self.step_fitness)
 
     def get_step_fitness(self, agents):
         """Get fitness of a trial."""
