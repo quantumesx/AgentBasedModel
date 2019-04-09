@@ -191,28 +191,31 @@ class MN_controller():
         self.propagate(inputs)
 
         # Use the following code if need to change controller architecture
-        for n in self.nodes.keys():
-            if self.nodes[n]['name'] == 'motor_left':
-                motor_left = self.nodes[n]['activation'][-1]
-            elif self.nodes[n]['name'] == 'motor_right':
-                motor_right = self.nodes[n]['activation'][-1]
-            elif self.nodes[n]['name'] == 'comm_unit':
-                comm_unit = self.nodes[n]['activation'][-1]
+        # for n in self.nodes.keys():
+        #    if self.nodes[n]['name'] == 'motor_left':
+        #        motor_left = self.nodes[n]['activation'][-1]
+        #    elif self.nodes[n]['name'] == 'motor_right':
+        #        motor_right = self.nodes[n]['activation'][-1]
+        #    elif self.nodes[n]['name'] == 'comm_unit':
+        #        comm_unit = self.nodes[n]['activation'][-1]
 
         # Otherwise, since we know the node id, this saves time
-        # motor_left = self.nodes[16]['activation'][-1]
-        # motor_right = self.nodes[17]['activation'][-1]
-        # comm_unit = self.nodes[18]['activation'][-1]
+        motor_left = self.nodes[16]['activation'][-1]
+        motor_right = self.nodes[17]['activation'][-1]
+        comm_unit = self.nodes[18]['activation'][-1]
 
         return motor_left, motor_right, comm_unit
 
-    def propagate(self, inputs):
+    def propagate(self, inputs, comm_unit_weight=False, validate=False):
         """
         Update activations in nodes.
 
         inputs:
         - sensor inputs (expect)
         - self: layer parameters, nodes, connections
+        - comm_unit_weight: whether weight is considered in the
+            comm_unit - comm_self connections. If False, then the weight
+            will always be set to 1
 
         actions:
         - get sensor activation for the current timestep
@@ -234,84 +237,36 @@ class MN_controller():
             - step 2: get internal nodes activation at t+1 via sensor(t)
             - step 3: get motor activation at t+1 via internal(t) and sensor(t)
         """
-        # otherwise variable names are too long
-        nodes = self.nodes
-        conn = self.connections
+        def get_input_nodes(output_node):
+            """Get all input giving nodes for a (internal or motor) node."""
+            index = [d['output'] for d in list(conn.values())]
+            indices = [i for i, x in enumerate(index) if x == output_node]
+            input_nodes = [conn[i]['input'] for i in indices]
+            return input_nodes
 
-        # whether weight is considered in comm_unit - comm_self connections
-        comm_unit_weight = True
+        def get_connections(output_node):
+            index = [d['output'] for d in list(conn.values())]
+            indices = [i for i, x in enumerate(index) if x == output_node]
+            return indices
 
-        # make sure the # of inputs is correct
-        if len(inputs) != self.i-1:  # this should be 13
-            print('Warning: incorrect input shape')
-
-        # get the id # for all the neurons
-        sensory_nodes = [n for n in nodes.keys()
-                         if nodes[n]['type'] == 'sensory']
-        internal_nodes = [n for n in nodes.keys()
-                          if nodes[n]['type'] == 'internal']
-        motor_nodes = [n for n in nodes.keys()
-                       if nodes[n]['type'] == 'motor']
-
-        # make sure the length of activations are as expected
-        a_sensor = [nodes[n]['activation'] for n in sensory_nodes]
-        len_sensor = [len(l) for l in a_sensor]
-
-        a_internal = [nodes[n]['activation'] for n in internal_nodes]
-        len_internal = [len(l) for l in a_internal]
-
-        a_motor = [nodes[n]['activation'] for n in motor_nodes]
-        len_motor = [len(l) for l in a_motor]
-
-        s_valid = max(len_sensor) == min(len_sensor)
-        i_valid = max(len_internal) == min(len_internal)
-        m_valid = max(len_motor) == min(len_motor)
-        diff_valid = (max(len_sensor) - max(len_motor) == -1)
-        eq_valid = (max(len_motor) == max(len_internal))
-        if not (s_valid and i_valid and m_valid and diff_valid and eq_valid):
-            print('Warning: the lengths are not as predicted')
-            print([len_sensor, len_internal, len_motor])
-        # else:
-            # print('lengths as predicted')
-
-        # Step 1: update sensors
-        for n in sensory_nodes:
-            # computation for comm_self is different than other sensors
-            if nodes[n]['name'] == 'comm_self':
-                signal = 0
-                for c in conn.keys():
-                    if conn[c]['output'] == n:  # there should only be one tho
-                        if comm_unit_weight:
-                            # method 1: treat comm_unit (t-1)* weight as sensor
-                            # for internal and motors, activation at current
-                            # time step t is already calculated, so t-1 is the
-                            # second to last value.
-                            input = nodes[conn[c]['input']]['activation'][-2]
-                            weight = conn[c]['weight']
-                            signal += input * weight
-                        else:
-                            # method 2: treat comm_unit as sensor (no weight)
-                            input = nodes[conn[c]['input']]['activation'][-2]
-                            signal += input
-            # computation for other sensors
-            else:
-                signal = inputs[n]  # signal from the sensor inputs
-
+        def get_sensory_activation(n, signal):
+            """Get sensor activation, given node # and signal."""
             time_const = nodes[n]['time_const']  # the node's time constant
             activation_last = nodes[n]['activation'][-1]  # last time
             activation = activation_last * time_const \
                 + signal * (1 - time_const)  # sensor node activation func
             self.nodes[n]['activation'].append(activation)
 
-        # Step 2: update internal nodes
-        new_activations = []
-        for n in internal_nodes:
-            sum_signals = 0
-            for c in conn.keys():
-                if conn[c]['output'] == n:
-                    input = nodes[conn[c]['input']]['activation'][-1]
-                    weight = conn[c]['weight']
-                    sum_signals += input * weight
+        def get_weighted_signal(c):
+            """Get internal node sum signal, given node #."""
+            input = nodes[conn[c]['input']]['activation'][-1]
+            weight = conn[c]['weight']
+            return input * weight
+
+        def get_internal_activation(n):
+            """Get internal node activation, given node #."""
+            connections = get_connections(n)
+            sum_signals = sum([get_weighted_signal(c) for c in connections])
 
             bias = nodes[n]['bias']
             time_const = nodes[n]['time_const']
@@ -323,23 +278,85 @@ class MN_controller():
                 ((1 + math.e ** (-a_raw)) ** -1) * (1 - time_const)
 
             # do not activate directly; update all together at the end of func
-            new_activations.append((n, activation))
+            return n, activation
 
-        # Step 3: update motor nodes
-        for n in motor_nodes:
-            sum_signals = 0
-            for c in conn.keys():
-                if conn[c]['output'] == n:
-                    input = nodes[conn[c]['input']]['activation'][-1]
-                    weight = conn[c]['weight']
-                    sum_signals += input * weight
+        def get_motor_activation(n):
+            """Get motor node activation, given node #."""
+            connections = get_connections(n)
+            sum_signals = sum([get_weighted_signal(c) for c in connections])
 
             bias = nodes[n]['bias']
             a_raw = bias + sum_signals
             activation = 1 / (1 + math.e ** (-a_raw))
 
             # do not activate directly; update all together at the end of func
-            new_activations.append((n, activation))
+            return n, activation
+
+        # otherwise variable names are too long
+        nodes = self.nodes
+        conn = self.connections
+
+        # get the id # for all the neurons
+        comm_self_node = 13
+        other_sensory_nodes = [n for n in nodes.keys()
+                               if nodes[n]['type'] == 'sensory' and n != 13]
+        internal_nodes = [n for n in nodes.keys()
+                          if nodes[n]['type'] == 'internal']
+        motor_nodes = [n for n in nodes.keys()
+                       if nodes[n]['type'] == 'motor']
+
+        if validate:
+            # make sure the # of inputs is correct
+            if len(inputs) != self.i-1:  # this should be 13
+                print('Warning: incorrect input shape')
+
+            # make sure the length of activations are as expected
+            a_sensor = [nodes[n]['activation']
+                        for n in other_sensory_nodes]
+            len_sensor = [len(l) for l in a_sensor] + 1
+
+            a_internal = [nodes[n]['activation'] for n in internal_nodes]
+            len_internal = [len(l) for l in a_internal]
+
+            a_motor = [nodes[n]['activation'] for n in motor_nodes]
+            len_motor = [len(l) for l in a_motor]
+
+            s_valid = max(len_sensor) == min(len_sensor)
+            i_valid = max(len_internal) == min(len_internal)
+            m_valid = max(len_motor) == min(len_motor)
+            diff_valid = (max(len_sensor) - max(len_motor) == -1)
+            eq_valid = (max(len_motor) == max(len_internal))
+            if not (s_valid and i_valid and m_valid
+                    and diff_valid and eq_valid):
+                print('Warning: the lengths are not as predicted')
+                print([len_sensor, len_internal, len_motor])
+            # else:
+                # print('lengths as predicted')
+
+        # Step 1: update sensors
+        [get_sensory_activation(n, inputs[n]) for n in other_sensory_nodes]
+
+        # computation for comm_self is different than other sensors
+        comm_self_signal = 0
+        for c in get_input_nodes(comm_self_node):  # there should only be 1
+            if comm_unit_weight:
+                    # method 1: treat comm_unit (t-1)* weight as sensor
+                    # for internal and motors, activation at current
+                    # time step t is already calculated, so t-1 is the
+                    # second to last value.
+                input = nodes[conn[c]['input']]['activation'][-2]
+                weight = conn[c]['weight']
+                comm_self_signal += input * weight
+            else:
+                # method 2: treat comm_unit as sensor (no weight)
+                input = nodes[conn[c]['input']]['activation'][-2]
+                comm_self_signal += input
+        get_sensory_activation(comm_self_node, comm_self_signal)
+
+        # Step 2: update internal nodes
+        new_activations = [get_internal_activation(n)
+                           for n in internal_nodes]
+        new_activations += [get_motor_activation(n) for n in motor_nodes]
 
         for n, a in new_activations:
             nodes[n]['activation'].append(a)
