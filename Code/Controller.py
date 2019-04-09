@@ -42,15 +42,29 @@ class MN_controller():
             print('Error: No genome.')
 
         # phenotype
-        self.nodes = self.generate_node_list()
-        self.connections = self.generate_connection_list()
+
+        # In the case of variable network dimensions, use the follow lines
+        # self.nodes = self.generate_node_list()
+        # self.connections = self.generate_connection_list()
+        # initialize activations
+        # for n in self.nodes.keys():
+        #    self.nodes[n]['activation'].append(0)
+        #    if self.nodes[n]['type'] != 'sensory':
+        #        self.nodes[n]['activation'].append(0)
+
+        # with fixed default network architecture, use this to save time:
+        self.nodes = self.get_default_nodes()
+        self.connections = self.get_default_connections()
+
         self.G_to_P()  # get phenotype from genome
 
-        # initialize activations
-        for n in self.nodes.keys():
-            self.nodes[n]['activation'].append(0)
-            if self.nodes[n]['type'] != 'sensory':
-                self.nodes[n]['activation'].append(0)
+    def get_default_nodes(self):
+        """Return node list for default MN controller."""
+        return default_node_list
+
+    def get_default_connections(self):
+        """Return connection list for default MN controller."""
+        return default_connection_list
 
     def generate_node_list(self):
         """Generate list of nodes for MN controller."""
@@ -175,13 +189,19 @@ class MN_controller():
 
         self.propagate(inputs)
 
-        for n in self.nodes.keys():
-            if self.nodes[n]['name'] == 'motor_left':
-                motor_left = self.nodes[n]['activation'][-1]
-            elif self.nodes[n]['name'] == 'motor_right':
-                motor_right = self.nodes[n]['activation'][-1]
-            elif self.nodes[n]['name'] == 'comm_unit':
-                comm_unit = self.nodes[n]['activation'][-1]
+        # Use the following code if need to change controller architecture
+        # for n in self.nodes.keys():
+        #    if self.nodes[n]['name'] == 'motor_left':
+        #        motor_left = self.nodes[n]['activation'][-1]
+        #    elif self.nodes[n]['name'] == 'motor_right':
+        #        motor_right = self.nodes[n]['activation'][-1]
+        #    elif self.nodes[n]['name'] == 'comm_unit':
+        #        comm_unit = self.nodes[n]['activation'][-1]
+
+        # Otherwise, since we know the node id, this saves time
+        motor_left = self.nodes[16]['activation'][-1]
+        motor_right = self.nodes[17]['activation'][-1]
+        comm_unit = self.nodes[18]['activation'][-1]
 
         return motor_left, motor_right, comm_unit
 
@@ -625,3 +645,276 @@ class controller():
                                         color='black',
                                         length_includes_head=True,
                                         head_width=3))
+
+
+default_node_list = {
+    0: {'activation': [0],
+        'name': 'IR_0',
+        'time_const_locus': 0,
+        'type': 'sensory'},
+    1: {'activation': [0],
+        'name': 'IR_1',
+        'time_const_locus': 1,
+        'type': 'sensory'},
+    2: {'activation': [0],
+        'name': 'IR_2',
+        'time_const_locus': 2,
+        'type': 'sensory'},
+    3: {'activation': [0],
+        'name': 'IR_3',
+        'time_const_locus': 3,
+        'type': 'sensory'},
+    4: {'activation': [0],
+        'name': 'IR_4',
+        'time_const_locus': 4,
+        'type': 'sensory'},
+    5: {'activation': [0],
+        'name': 'IR_5',
+        'time_const_locus': 5,
+        'type': 'sensory'},
+    6: {'activation': [0],
+        'name': 'IR_6',
+        'time_const_locus': 6,
+        'type': 'sensory'},
+    7: {'activation': [0],
+        'name': 'IR_7',
+        'time_const_locus': 7,
+        'type': 'sensory'},
+    8: {'activation': [0],
+        'name': 'comm_0',
+        'time_const_locus': 8,
+        'type': 'sensory'},
+    9: {'activation': [0],
+        'name': 'comm_1',
+        'time_const_locus': 9,
+        'type': 'sensory'},
+    10: {'activation': [0],
+         'name': 'comm_2',
+         'time_const_locus': 10,
+         'type': 'sensory'},
+    11: {'activation': [0],
+         'name': 'comm_3',
+         'time_const_locus': 11,
+         'type': 'sensory'},
+    12: {'activation': [0],
+         'name': 'ground',
+         'time_const_locus': 12,
+         'type': 'sensory'},
+    13: {'activation': [0],
+         'name': 'comm_self',
+         'time_const_locus': 13,
+         'type': 'sensory'},
+    14: {'activation': [0, 0],
+         'bias_locus': 16,
+         'name': 'internal_1',
+         'time_const_locus': 14,
+         'type': 'internal'},
+    15: {'activation': [0, 0],
+         'bias_locus': 17,
+         'name': 'internal_2',
+         'time_const_locus': 15,
+         'type': 'internal'},
+    16: {'activation': [0, 0],
+         'bias_locus': 18,
+         'name': 'motor_left',
+         'type': 'motor'},
+    17: {'activation': [0, 0],
+         'bias_locus': 19,
+         'name': 'motor_right',
+         'type': 'motor'},
+    18: {'activation': [0, 0],
+         'bias_locus': 20,
+         'name': 'comm_unit',
+         'type': 'motor'}
+    }
+
+default_connection_list = {
+    0: {'input': 0,
+        'mode': 'sensor_to_internal',
+        'output': 14,
+        'weight_locus': 21},
+    1: {'input': 0, 'mode': 'sensor_to_motor',
+        'output': 16, 'weight_locus': 22},
+    2: {'input': 0, 'mode': 'sensor_to_motor',
+        'output': 17, 'weight_locus': 23},
+    3: {'input': 0, 'mode': 'sensor_to_motor',
+        'output': 18, 'weight_locus': 24},
+    4: {'input': 1,
+        'mode': 'sensor_to_internal',
+        'output': 14,
+        'weight_locus': 25},
+    5: {'input': 1, 'mode': 'sensor_to_motor',
+        'output': 16, 'weight_locus': 26},
+    6: {'input': 1, 'mode': 'sensor_to_motor',
+        'output': 17, 'weight_locus': 27},
+    7: {'input': 1, 'mode': 'sensor_to_motor',
+        'output': 18, 'weight_locus': 28},
+    8: {'input': 2,
+        'mode': 'sensor_to_internal',
+        'output': 14,
+        'weight_locus': 29},
+    9: {'input': 2, 'mode': 'sensor_to_motor',
+        'output': 16, 'weight_locus': 30},
+    10: {'input': 2, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 31},
+    11: {'input': 2, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 32},
+    12: {'input': 3,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 33},
+    13: {'input': 3, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 34},
+    14: {'input': 3, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 35},
+    15: {'input': 3, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 36},
+    16: {'input': 4,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 37},
+    17: {'input': 4, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 38},
+    18: {'input': 4, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 39},
+    19: {'input': 4, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 40},
+    20: {'input': 5,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 41},
+    21: {'input': 5, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 42},
+    22: {'input': 5, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 43},
+    23: {'input': 5, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 44},
+    24: {'input': 6,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 45},
+    25: {'input': 6, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 46},
+    26: {'input': 6, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 47},
+    27: {'input': 6, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 48},
+    28: {'input': 7,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 49},
+    29: {'input': 7, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 50},
+    30: {'input': 7, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 51},
+    31: {'input': 7, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 52},
+    32: {'input': 8,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 53},
+    33: {'input': 8, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 54},
+    34: {'input': 8, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 55},
+    35: {'input': 8, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 56},
+    36: {'input': 9,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 57},
+    37: {'input': 9, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 58},
+    38: {'input': 9, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 59},
+    39: {'input': 9, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 60},
+    40: {'input': 10,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 61},
+    41: {'input': 10,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 62},
+    42: {'input': 10,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 63},
+    43: {'input': 10,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 64},
+    44: {'input': 11,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 65},
+    45: {'input': 11,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 66},
+    46: {'input': 11,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 67},
+    47: {'input': 11,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 68},
+    48: {'input': 12,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 69},
+    49: {'input': 12,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 70},
+    50: {'input': 12,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 71},
+    51: {'input': 12,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 72},
+    52: {'input': 13,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 73},
+    53: {'input': 13,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 74},
+    54: {'input': 13,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 75},
+    55: {'input': 13,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 76},
+    56: {'input': 14,
+         'mode': 'internal_to_internal',
+         'output': 15,
+         'weight_locus': 77},
+    57: {'input': 14,
+         'mode': 'internal_to_motor',
+         'output': 16,
+         'weight_locus': 78},
+    58: {'input': 14,
+         'mode': 'internal_to_motor',
+         'output': 17,
+         'weight_locus': 79},
+    59: {'input': 14,
+         'mode': 'internal_to_motor',
+         'output': 18,
+         'weight_locus': 80},
+    60: {'input': 15,
+         'mode': 'internal_to_internal',
+         'output': 14,
+         'weight_locus': 81},
+    61: {'input': 18,
+         'mode': 'motor_to_sensor',
+         'output': 13,
+         'weight_locus': 82}
+    }

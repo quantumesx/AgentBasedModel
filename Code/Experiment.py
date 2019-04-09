@@ -49,25 +49,30 @@ class experiment():
 
         self.genome.append(first_gen)
 
+    def run_gen(self, g):
+        """Run one generation."""
+        # Get fitness for all populations
+        pop_fitness = self.get_gen_fitness(self.genome[-1])
+
+        # select 20 best performing teams
+        top_genome = self.select_top(pop_fitness, top=self.include_top)
+
+        # Generate new generation
+        new_gen = self.get_new_population(top_genome)
+
+        # update info
+        self.top.append(top_genome)
+        self.fitness.append(pop_fitness)
+        self.genome.append(new_gen)
+
+        return g
+
     def run(self):
         """Run experiment."""
         # iterate through each generation
-        for g in range(self.gen):
-            print('Current generation:', g)
+        [self.run_gen(g) for g in range(self.gen)]
 
-            # Get fitness for all populations
-            pop_fitness = self.run_gen(self.genome[-1])
-
-            # select 20 best performing teams
-            top_genome = self.select_top(pop_fitness, top=self.include_top)
-            self.top.append(top_genome)
-
-            new_gen = self.get_new_population(top_genome)
-
-            self.fitness.append(pop_fitness)
-            self.genome.append(new_gen)
-
-    def run_gen(self, gen_genome):
+    def get_gen_fitness(self, gen_genome):
         """
         Run all trials for a generation.
 
@@ -78,28 +83,30 @@ class experiment():
         output:
         - gen_fitness: a list of the fitness for every corresponding population
         """
+        def get_pop_fitness(ann):
+            """Get the fitness of a genotype through behavioral trials."""
+            t = trial(ann)
+            t.run(record=False)
+            return t.fitness
+
+        def get_all_fitness(genome):
+            """Get the fitness of an entire generation."""
+            ann = MN_controller(genome)
+
+            # fitness of the trials
+            total_fit = [get_pop_fitness(ann) for i in range(self.trial)]
+
+            # iterate through each trial; default = 20
+            fitness = sum(total_fit) / self.trial
+
+            # update both the genome and the fitness to gen_fitness
+            return genome, fitness
+
         # Just to make sure
         if len(gen_genome) != self.pop:
             print('Error: number of genome not equal to number of population.')
 
-        gen_fitness = []
-
-        # iterate through each population; default = 100
-        for p in tqdm(range(self.pop)):
-            genome = gen_genome[p]
-
-            ann = MN_controller(genome)
-            total_fit = []  # fitness of the trials
-
-            # iterate through each trial; default = 20
-            for i in range(self.trial):
-                t = trial(ann)
-                t.run(record=False)
-                total_fit.append(t.fitness)
-            fitness = sum(total_fit) / self.trial
-
-            # update both the genome and the fitness to gen_fitness
-            gen_fitness.append([genome, fitness])
+        gen_fitness = [get_all_fitness(g) for g in tqdm(gen_genome)]
 
         return gen_fitness
 
@@ -134,7 +141,7 @@ class experiment():
         - next_gen: list of new genome for the next generation.
                     (length = self.population)
         """
-        def mutate(l, mutation_rate):
+        def mutate_loc(l, mutation_rate):
             """
             Mutate a location in a genome.
 
@@ -149,16 +156,17 @@ class experiment():
             else:
                 return l
 
+        def mutate_genome(g, mutation_rate):
+            """Mutate a population's genome."""
+            return [mutate_loc(l, mutation_rate) for l in g]
+
         rep = self.pop / len(top_genome)
         if rep != int(rep):
             print('Warning: expected number of replica is not an integer.')
 
-        next_gen = []
         # for every genotype:
-        for g in top_genome:
-            for r in range(int(rep)):
-                # for every location:
-                new = [mutate(l, mutation_rate) for l in g]
-                next_gen.append(new)
-
+        # outcomes should be g1, g1, g1, ... g2, g2, ....
+        next_gen = [mutate_genome(g, mutation_rate)
+                    for g in top_genome
+                    for r in range(rep)]
         return next_gen
