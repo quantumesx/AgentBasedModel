@@ -43,18 +43,20 @@ class MN_controller():
 
         # phenotype
 
-        # In the case of variable network dimensions, use the follow lines
-        # self.nodes = self.generate_node_list()
-        # self.connections = self.generate_connection_list()
-        # initialize activations
-        # for n in self.nodes.keys():
-        #    self.nodes[n]['activation'].append(0)
-        #    if self.nodes[n]['type'] != 'sensory':
-        #        self.nodes[n]['activation'].append(0)
-
         # with fixed default network architecture, use this to save time:
         self.nodes = self.get_default_nodes()
         self.connections = self.get_default_connections()
+
+        # In the case of variable network dimensions, use the follow lines
+        # self.nodes = self.generate_node_list()
+        # self.connections = self.generate_connection_list()
+
+        # initialize activations
+        # for n in self.nodes.keys():
+        #    self.nodes[n]['activation'] = []
+        #    self.nodes[n]['activation'].append(0)
+        #    if self.nodes[n]['type'] != 'sensory':
+        #        self.nodes[n]['activation'].append(0)
 
         self.G_to_P()  # get phenotype from genome
 
@@ -165,7 +167,6 @@ class MN_controller():
     def G_to_P(self):
         """Convert genome type to phenotype."""
         for n in self.nodes.keys():
-            self.nodes[n]['activation'] = []
             if 'time_const_locus' in self.nodes[n].keys():
                 self.nodes[n]['time_const'] = normalize(self.genome[
                     self.nodes[n]['time_const_locus']], out_min=0, out_max=1)
@@ -190,18 +191,18 @@ class MN_controller():
         self.propagate(inputs)
 
         # Use the following code if need to change controller architecture
-        # for n in self.nodes.keys():
-        #    if self.nodes[n]['name'] == 'motor_left':
-        #        motor_left = self.nodes[n]['activation'][-1]
-        #    elif self.nodes[n]['name'] == 'motor_right':
-        #        motor_right = self.nodes[n]['activation'][-1]
-        #    elif self.nodes[n]['name'] == 'comm_unit':
-        #        comm_unit = self.nodes[n]['activation'][-1]
+        for n in self.nodes.keys():
+            if self.nodes[n]['name'] == 'motor_left':
+                motor_left = self.nodes[n]['activation'][-1]
+            elif self.nodes[n]['name'] == 'motor_right':
+                motor_right = self.nodes[n]['activation'][-1]
+            elif self.nodes[n]['name'] == 'comm_unit':
+                comm_unit = self.nodes[n]['activation'][-1]
 
         # Otherwise, since we know the node id, this saves time
-        motor_left = self.nodes[16]['activation'][-1]
-        motor_right = self.nodes[17]['activation'][-1]
-        comm_unit = self.nodes[18]['activation'][-1]
+        # motor_left = self.nodes[16]['activation'][-1]
+        # motor_right = self.nodes[17]['activation'][-1]
+        # comm_unit = self.nodes[18]['activation'][-1]
 
         return motor_left, motor_right, comm_unit
 

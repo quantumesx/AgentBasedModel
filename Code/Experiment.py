@@ -25,7 +25,7 @@ class experiment():
         """Initialize the experiment."""
         self.pop = pop  # population size
         self.gen = gen  # total # of generations to run
-        self.trial = 20  # trial to run for each group in the population
+        self.trial = trial  # trial to run for each group in the population
         self.include_top = include_top
 
         self.genome_size = genome_size
@@ -35,8 +35,6 @@ class experiment():
 
         if new_run:
             self.generate_first_gen()
-        else:
-            pass
 
     def generate_first_gen(self):
         """Generate genome for the first generation."""
@@ -48,6 +46,11 @@ class experiment():
                      for p in range(self.pop)]
 
         self.genome.append(first_gen)
+
+    def run(self):
+        """Run experiment."""
+        # iterate through each generation
+        [self.run_gen(g) for g in range(self.gen)]
 
     def run_gen(self, g):
         """Run one generation."""
@@ -66,11 +69,6 @@ class experiment():
         self.genome.append(new_gen)
 
         return g
-
-    def run(self):
-        """Run experiment."""
-        # iterate through each generation
-        [self.run_gen(g) for g in range(self.gen)]
 
     def get_gen_fitness(self, gen_genome):
         """
