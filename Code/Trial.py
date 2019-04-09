@@ -4,6 +4,7 @@ from Agent import agent
 from Environment import environment
 from Helper import find_dx, find_dy, get_distance
 
+import pickle
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow
 
@@ -100,7 +101,7 @@ class trial():
         # this updates loc and ang
         # so essential to store current data before this
 
-    def run(self, record=True):
+    def run(self, record=False, save=False):
         """Run trial."""
         # set up
         self.trial_setup()
@@ -117,6 +118,8 @@ class trial():
                           a.ang_data,
                           a.input_data,
                           a.output_data] for a in self.env.agents]
+        if save:
+            pickle.dump(self.data, open('trial_data/'+self.name+'.trial', 'wb'))
 
     def get_fitness(self):
         """Get fitness for all steps and overall fitness for the trial."""

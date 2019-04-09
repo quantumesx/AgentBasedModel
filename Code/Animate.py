@@ -13,7 +13,7 @@ def animate(trial, name='unnamed_trial'):
     """
     fig = plt.figure()
     fig.set_dpi(100)
-    fig.set_size_inches(5, 4.5)
+    fig.set_size_inches(5, 5)
 
     ax = plt.axes(xlim=(0, 270), ylim=(0, 270))
     agents = trial.env.agents
