@@ -15,7 +15,6 @@ class trial():
 
     def __init__(self,
                  controller,
-                 comm_disabled=False,
                  iteration=1000,
                  time=0.1,
                  name='unnamed_trial',
@@ -31,7 +30,6 @@ class trial():
         self.step_time = 0.1  # time for each iteration step in seconds
         self.step_fitness = []  # fitness at each timestep
         self.fitness = 0  # total fitness
-        self.comm_disabled = comm_disabled
 
         # initialize environment
         self.env = environment(width=env_width, height=env_height,
@@ -84,10 +82,7 @@ class trial():
             # first get all sensor data
             a.get_ground_reading(self.env)
             a.get_ir_readings(self.env)
-            if self.comm_disabled:
-                a.comm_readings = [0, 0, 0, 0]
-            else:
-                a.get_comm_readings(self.env)
+            a.get_comm_readings(self.env)
 
             # then get outputs
             # updates left_output, right_output, comm_output

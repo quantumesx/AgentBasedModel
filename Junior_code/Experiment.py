@@ -31,6 +31,7 @@ class experiment():
                 -> return a mutated genotype
                 - mutate_loc()
                     -> mutate a single location
+
     """
 
     def __init__(self,
@@ -92,7 +93,6 @@ class experiment():
 
         # Generate new generation
         self.get_new_generation(gen)
-
 
     def get_gen_fitness(self, gen):
         """

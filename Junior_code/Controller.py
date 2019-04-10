@@ -2,12 +2,13 @@
 The controller module.
 
 Functions:
-1. Create a network object (preset node/connections metrics based on MN2007)
-2. Read a genome (list) and convert it into the phenotype of a network
-3. Give sensor inputs, get motor output
+1. Creating a network
+2. Updating weights of a network
+3.
 """
 
 import random as rd
+import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow
 import math
@@ -19,8 +20,7 @@ class MN_controller():
     """Generate a MN controller."""
 
     def __init__(self, genome=[], i=14, h=2, o=3,
-                 comm_self_connected=True,
-                 random=False, name='nameless_controller'):
+                 genome_size=83, random=False, name='nameless_controller'):
         """Initialize the network."""
         super().__init__()
 
@@ -32,23 +32,20 @@ class MN_controller():
         self.h = h  # number of hidden nodes
         self.o = o  # number of output nodes
 
-        # with fixed default network architecture, use this to save time:
-        self.nodes = default_node_list
-
-        if comm_self_connected:
-            self.genome_size = 69
-            self.connections = default_connections
-        else:
-            self.genome_size = 65
-            self.connections = default_connections_no_comm_self
-
         # genotype
         if genome:
             self.genome = genome
         elif random:
-            self.genome = rd.choices(range(0, 255), k=self.genome_size)
+            genome = rd.choices(range(0, 255), k=genome_size)
+            self.genome = genome
         else:
             print('Error: No genome.')
+
+        # phenotype
+
+        # with fixed default network architecture, use this to save time:
+        self.nodes = self.get_default_nodes()
+        self.connections = self.get_default_connections()
 
         # In the case of variable network dimensions, use the follow lines
         # self.nodes = self.generate_node_list()
@@ -61,8 +58,15 @@ class MN_controller():
         #    if self.nodes[n]['type'] != 'sensory':
         #        self.nodes[n]['activation'].append(0)
 
-        # phenotype
         self.G_to_P()  # get phenotype from genome
+
+    def get_default_nodes(self):
+        """Return node list for default MN controller."""
+        return default_node_list
+
+    def get_default_connections(self):
+        """Return connection list for default MN controller."""
+        return default_connection_list
 
     def generate_node_list(self):
         """Generate list of nodes for MN controller."""
@@ -99,21 +103,8 @@ class MN_controller():
                                       'bias_locus': n+self.i+self.h*2}
         return nodes
 
-    def generate_connection_list(self, comm_self_connected=True):
-        """
-        Generate list of all possible connections for MN controller.
-
-        This version is exactly as the diagram shows.
-        comm_self_connected:
-        - if set to True, the network connections are exactly as the diagram
-            suggests in M & N (2007).
-                - Corresponds with a genome_size of 69
-        - if set to False, connections to the comm_self nodes will not
-            be included. This is used to see whether self modulation is
-            needed for the evolution of communicationself.
-                - This leads to 44 possible connections
-                - Corresponds with a genome_size of 65
-        """
+    def generate_connection_list(self):
+        """Generate list of all possible connections for MN controller."""
         offset = self.i + self.h * 2 + self.o
 
         connections = {}
@@ -122,34 +113,19 @@ class MN_controller():
         for i in self.nodes.keys():
             # sensory nodes
             if self.nodes[i]['type'] == 'sensory':
-                # comm_self node
-                if self.nodes[i]['name'] == 'comm_self':
-                    # do this only if comm_self_connected is set to be true
-                    if comm_self_connected:
-                        for j in self.nodes.keys():
-                            # comm_self to motors and comm_unit
-                            if self.nodes[j]['type'] == 'motor':
-                                connections[n] = {'input': i, 'output': j,
-                                                  'mode': 'sensor_to_motor',
-                                                  'weight_locus': n+offset}
-                                n += 1
-
-                # other sensory nodes
-                else:
-                    for j in self.nodes.keys():
-                        # sensor to internal
-                        if self.nodes[j]['name'] == 'internal_1':
-                            connections[n] = {'input': i, 'output': j,
-                                              'mode': 'sensor_to_internal',
-                                              'weight_locus': n+offset}
-                            n += 1
-                        # sensor to motor except for comm_unit
-                        if self.nodes[j]['type'] == 'motor':
-                            if self.nodes[j]['name'] != 'comm_unit':
-                                connections[n] = {'input': i, 'output': j,
-                                                  'mode': 'sensor_to_motor',
-                                                  'weight_locus': n+offset}
-                                n += 1
+                for j in self.nodes.keys():
+                    # sensor to internal
+                    if self.nodes[j]['name'] == 'internal_1':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'sensor_to_internal',
+                                          'weight_locus': n+offset}
+                        n += 1
+                    # sensor to motor
+                    if self.nodes[j]['type'] == 'motor':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'sensor_to_motor',
+                                          'weight_locus': n+offset}
+                        n += 1
 
             # internal node 1
             if self.nodes[i]['name'] == 'internal_1':
@@ -178,15 +154,14 @@ class MN_controller():
                         n += 1
 
             # comm unit to comm_self
-            # do this only if comm_self_connected is set to be true
-            if comm_self_connected:
-                if self.nodes[i]['name'] == 'comm_unit':
-                    for j in self.nodes.keys():
-                        if self.nodes[j]['name'] == 'comm_self':
-                            connections[n] = {'input': i, 'output': j,
-                                              'mode': 'motor_to_sensor',
-                                              'weight_locus': n+offset}
-                            n += 1
+            if self.nodes[i]['name'] == 'comm_unit':
+                for j in self.nodes.keys():
+                    if self.nodes[j]['name'] == 'comm_self':
+                        connections[n] = {'input': i, 'output': j,
+                                          'mode': 'motor_to_sensor',
+                                          'weight_locus': n+offset}
+                        n += 1
+
         return connections
 
     def G_to_P(self):
@@ -423,7 +398,7 @@ class MN_controller():
                     out = self.connections[c]['output']
                     j = nodes[out]
 
-                    color = 'black'
+                    color = 'gray'
                     if self.connections[c]['weight'] < 0:
                         color = 'blue'
                     elif self.connections[c]['weight'] > 0:
@@ -439,12 +414,256 @@ class MN_controller():
         ax.figure.set_size_inches(6, 6)
 
 
-# loci to get rid of going from size 83 to 69
-extra_loci = [24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 73]
-# loci to get rid of going from size 83 to 65
-comm_self_loci_old = [74, 75, 76, 82]
-# loci to get rid of going from size 69 to 65
-comm_self_loci_new = [39, 40, 41, 47]
+class controller():
+    """Generate a controller."""
+
+    def __init__(self, genome=[], i=14, h=2, o=3, preset='',
+                 verbose=False, random=False):
+        # i: input, h: hidden, o: output
+        """
+        Initialize a network.
+
+        Arguments:
+        i = number of input nodes
+        h = number of hidden nodes
+        o = number of output nodes
+        """
+        super().__init__()
+
+        # initialize nodes
+        self.i = i  # number of input nodes
+        self.h = h  # number of hidden nodes
+        self.o = o  # number of output nodes
+
+        self.genome = []
+
+        self.input_activation = [0] * i  # activation of input nodes
+
+        self.hidden_activation = [0]*h  # activation of hidden nodes
+        self.hidden_bias = [0]*h  # bias of hidden nodes
+
+        self.output_activation = [0]*o  # activation of output nodes
+        self.output_bias = [0]*o  # bias of output nodes
+
+        self.i2h_weights = [[0]*i]*h
+        self.h2o_weights = [[0]*h]*o
+
+        # Order of calculation:
+        # First iterate through receiving nodes,
+        # Then for each receiving node iterate through activated nodes
+        # E.g.:
+        # All input nodes->hidden 1; all input nodes->hidden 2; ...
+        # Therefore the weights are formated correspondingly as:
+        # [
+        #   [input1-hidden1, input2-hidden1, ...],
+        #   [all inputs to hidden2], ...
+        # ]
+
+        if random:
+            self.initialize_random_weights()
+            self.initialize_random_bias()
+        elif genome:
+            self.GtoP(genome)
+        else:
+            print('No genome; weights randomly generated.')
+            self.initialize_random_weights()
+            self.initialize_random_bias()
+
+    def initialize_random_weights(self):
+        """
+        Initialize weights with random values.
+
+        The random values are drawn from uniform distribution (-1, 1).
+        """
+        # initialize weights (random values from uniform distribution (-1, 1))
+        self.i2h_weights = []
+        for i in range(self.h):
+            w = []
+            for j in range(self.i):
+                w.append(rd.uniform(-5, 5))
+            self.i2h_weights.append(w)
+
+        self.h2o_weights = []
+        for i in range(self.o):
+            w = []
+            for j in range(self.h):
+                w.append(rd.uniform(-5, 5))
+            self.h2o_weights.append(w)
+
+    def initialize_random_bias(self):
+        """
+        Initialize biases with random values.
+
+        The random values are drawn from uniform distribution (-1, 1).
+        """
+        self.hidden_bias = []
+        for i in range(self.h):
+            self.hidden_bias.append(rd.uniform(-5, 5))
+
+        self.output_bias = []
+        for i in range(self.o):
+            self.output_bias.append(rd.uniform(-5, 5))
+
+    def update_MnN(self):
+        """Perform network computation based on Maracoo and Nolfi (2003)."""
+        pass
+
+    def feedforward(self):
+        """Perform feedforward computation."""
+        # hidden node activation
+        for i in range(self.h):
+            h_raw = []
+            for j in range(self.i):
+                activation = self.hidden_bias[i] + \
+                    self.input_activation[j] * self.i2h_weights[i][j]
+                h_raw.append(activation)
+            # currently use tanh as activation function
+            self.hidden_activation[i] = np.tanh(sum(h_raw))
+        # print(self.hidden)
+
+        for i in range(self.o):
+            o_raw = []
+            for j in range(self.h):
+                activation = self.output_bias[i] + \
+                    self.hidden_activation[j] * self.h2o_weights[i][j]
+                o_raw.append(activation)
+            # currently use tanh as activation function
+            self.output_activation[i] = np.tanh(sum(o_raw))
+
+    def GtoP(self, genome):
+        """
+        Convert genome to network metrics.
+
+        Need to update this to fit MN network.
+        """
+        n = 0
+
+        self.i2h_weights = []
+        for i in range(self.h):
+            w = []
+            for j in range(self.i):
+                w.append(normalize(genome[n]))
+                n += 1
+            self.i2h_weights.append(w)
+        print(n)
+
+        self.h2o_weights = []
+        for i in range(self.o):
+            w = []
+            for j in range(self.h):
+                w.append(normalize(genome[n]))
+                n += 1
+            self.h2o_weights.append(w)
+        print(n)
+
+        self.hidden_bias = [normalize(x) for x in genome[n:n+self.h]]
+        self.output_bias = [normalize(x) for x in genome[n+self.h:]]
+
+    def mutate(self, rate=0.2):
+        """Mutate weight and biases in a network."""
+        # mutate input bias
+        new_input_bias = []
+        for i in range(self.i):
+            if rd.uniform(0, 1) >= rate:
+                new_input_bias.append(self.input_bias[i])
+            else:
+                new_input_bias.append(rd.uniform(-1, 1))
+        self.input_bias = new_input_bias
+
+        # mutate hidden bias
+        new_hidden_bias = []
+        for i in range(self.h):
+            if rd.uniform(0, 1) >= rate:
+                new_hidden_bias.append(self.hidden_bias[i])
+            else:
+                new_hidden_bias.append(rd.uniform(-1, 1))
+        self.hidden_bias = new_hidden_bias
+
+        # mutate output bias
+        new_output_bias = []
+        for i in range(self.o):
+            if rd.uniform(0, 1) >= rate:
+                new_output_bias.append(self.output_bias[i])
+            else:
+                new_output_bias.append(rd.uniform(-1, 1))
+        self.output_bias = new_output_bias
+
+        # mutate input to hideen weights
+        new_i2h_weights = []
+        for h in range(self.h):
+            weights = []
+            for i in range(self.i):
+                if rd.uniform(0, 1) >= rate:
+                    weights.append(self.i2h_weights[h][i])
+                else:
+                    weights.append(rd.uniform(-1, 1))
+            new_i2h_weights.append(weights)
+        self.i2h_weights = new_i2h_weights
+
+        # mutate hideen to output weights
+        new_h2o_weights = []
+        for o in range(self.o):
+            weights = []
+            for h in range(self.h):
+                if rd.uniform(0, 1) >= rate:
+                    weights.append(self.h2o_weights[o][h])
+                else:
+                    weights.append(rd.uniform(-1, 1))
+            new_h2o_weights.append(weights)
+        self.h2o_weights = new_h2o_weights
+
+        print('All mutated')
+
+    def show(self):
+        """Show network."""
+        ax = plt.axes(xlim=(0, max(self.i, self.h, self.o)*25 + 25),
+                      ylim=(0, 200))
+        line, = ax.plot([], [])
+        ax.set_aspect('equal')
+        ax.figure.set_size_inches(5, 2)
+
+        i_nodes = []
+        h_nodes = []
+        o_nodes = []
+
+        x = 25
+        y = 150
+        for t in range(self.i):
+            ax.add_patch(Circle((x, y), 10, color='green'))
+            i_nodes.append((x, y))
+            x += 25
+
+        y -= 50
+        x = (max(self.i, self.h, self.o)-self.h)/2 * 25 + 25
+        for t in range(self.h):
+            ax.add_patch(Circle((x, y), 10, color='purple'))
+            h_nodes.append((x, y))
+            x += 25
+
+        y -= 50
+        x = (max(self.i, self.h, self.o)-self.o)/2 * 25 + 25
+        for t in range(self.o):
+            ax.add_patch(Circle((x, y), 10, color='blue'))
+            o_nodes.append((x, y))
+            x += 25
+
+        for t in i_nodes:
+            for j in h_nodes:
+                ax.add_patch(FancyArrow(t[0], t[1],
+                                        j[0]-t[0], j[1]-t[1],
+                                        width=0.00000001,
+                                        color='black',
+                                        length_includes_head=True,
+                                        head_width=3))
+        for t in h_nodes:
+            for j in o_nodes:
+                ax.add_patch(FancyArrow(t[0], t[1],
+                                        j[0]-t[0], j[1]-t[1],
+                                        width=0.00000001,
+                                        color='black',
+                                        length_includes_head=True,
+                                        head_width=3))
+
 
 default_node_list = {
     0: {'activation': [0],
@@ -527,7 +746,7 @@ default_node_list = {
          'type': 'motor'}
     }
 
-default_connections = {
+default_connection_list = {
     0: {'input': 0,
         'mode': 'sensor_to_internal',
         'output': 14,
@@ -536,286 +755,184 @@ default_connections = {
         'output': 16, 'weight_locus': 22},
     2: {'input': 0, 'mode': 'sensor_to_motor',
         'output': 17, 'weight_locus': 23},
-    3: {'input': 1,
+    3: {'input': 0, 'mode': 'sensor_to_motor',
+        'output': 18, 'weight_locus': 24},
+    4: {'input': 1,
         'mode': 'sensor_to_internal',
         'output': 14,
-        'weight_locus': 24},
-    4: {'input': 1, 'mode': 'sensor_to_motor',
-        'output': 16, 'weight_locus': 25},
+        'weight_locus': 25},
     5: {'input': 1, 'mode': 'sensor_to_motor',
-        'output': 17, 'weight_locus': 26},
-    6: {'input': 2,
+        'output': 16, 'weight_locus': 26},
+    6: {'input': 1, 'mode': 'sensor_to_motor',
+        'output': 17, 'weight_locus': 27},
+    7: {'input': 1, 'mode': 'sensor_to_motor',
+        'output': 18, 'weight_locus': 28},
+    8: {'input': 2,
         'mode': 'sensor_to_internal',
         'output': 14,
-        'weight_locus': 27},
-    7: {'input': 2, 'mode': 'sensor_to_motor',
-        'output': 16, 'weight_locus': 28},
-    8: {'input': 2, 'mode': 'sensor_to_motor',
-        'output': 17, 'weight_locus': 29},
-    9: {'input': 3,
-        'mode': 'sensor_to_internal',
-        'output': 14,
-        'weight_locus': 30},
-    10: {'input': 3, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 31},
-    11: {'input': 3, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 32},
-    12: {'input': 4,
+        'weight_locus': 29},
+    9: {'input': 2, 'mode': 'sensor_to_motor',
+        'output': 16, 'weight_locus': 30},
+    10: {'input': 2, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 31},
+    11: {'input': 2, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 32},
+    12: {'input': 3,
          'mode': 'sensor_to_internal',
          'output': 14,
          'weight_locus': 33},
-    13: {'input': 4, 'mode': 'sensor_to_motor',
+    13: {'input': 3, 'mode': 'sensor_to_motor',
          'output': 16, 'weight_locus': 34},
-    14: {'input': 4, 'mode': 'sensor_to_motor',
+    14: {'input': 3, 'mode': 'sensor_to_motor',
          'output': 17, 'weight_locus': 35},
-    15: {'input': 5,
+    15: {'input': 3, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 36},
+    16: {'input': 4,
          'mode': 'sensor_to_internal',
          'output': 14,
-         'weight_locus': 36},
-    16: {'input': 5, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 37},
-    17: {'input': 5, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 38},
-    18: {'input': 6,
+         'weight_locus': 37},
+    17: {'input': 4, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 38},
+    18: {'input': 4, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 39},
+    19: {'input': 4, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 40},
+    20: {'input': 5,
          'mode': 'sensor_to_internal',
          'output': 14,
-         'weight_locus': 39},
-    19: {'input': 6, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 40},
-    20: {'input': 6, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 41},
-    21: {'input': 7,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 42},
-    22: {'input': 7, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 43},
-    23: {'input': 7, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 44},
-    24: {'input': 8,
+         'weight_locus': 41},
+    21: {'input': 5, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 42},
+    22: {'input': 5, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 43},
+    23: {'input': 5, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 44},
+    24: {'input': 6,
          'mode': 'sensor_to_internal',
          'output': 14,
          'weight_locus': 45},
-    25: {'input': 8, 'mode': 'sensor_to_motor',
+    25: {'input': 6, 'mode': 'sensor_to_motor',
          'output': 16, 'weight_locus': 46},
-    26: {'input': 8, 'mode': 'sensor_to_motor',
+    26: {'input': 6, 'mode': 'sensor_to_motor',
          'output': 17, 'weight_locus': 47},
-    27: {'input': 9,
+    27: {'input': 6, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 48},
+    28: {'input': 7,
          'mode': 'sensor_to_internal',
          'output': 14,
-         'weight_locus': 48},
-    28: {'input': 9, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 49},
-    29: {'input': 9, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 50},
-    30: {'input': 10,
+         'weight_locus': 49},
+    29: {'input': 7, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 50},
+    30: {'input': 7, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 51},
+    31: {'input': 7, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 52},
+    32: {'input': 8,
          'mode': 'sensor_to_internal',
          'output': 14,
-         'weight_locus': 51},
-    31: {'input': 10,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 52},
-    32: {'input': 10,
-         'mode': 'sensor_to_motor',
-         'output': 17,
          'weight_locus': 53},
-    33: {'input': 11,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 54},
-    34: {'input': 11,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 55},
-    35: {'input': 11,
-         'mode': 'sensor_to_motor',
-         'output': 17,
-         'weight_locus': 56},
-    36: {'input': 12,
+    33: {'input': 8, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 54},
+    34: {'input': 8, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 55},
+    35: {'input': 8, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 56},
+    36: {'input': 9,
          'mode': 'sensor_to_internal',
          'output': 14,
          'weight_locus': 57},
-    37: {'input': 12,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 58},
-    38: {'input': 12,
-         'mode': 'sensor_to_motor',
-         'output': 17,
-         'weight_locus': 59},
-    39: {'input': 13,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 60},
-    40: {'input': 13,
-         'mode': 'sensor_to_motor',
-         'output': 17,
+    37: {'input': 9, 'mode': 'sensor_to_motor',
+         'output': 16, 'weight_locus': 58},
+    38: {'input': 9, 'mode': 'sensor_to_motor',
+         'output': 17, 'weight_locus': 59},
+    39: {'input': 9, 'mode': 'sensor_to_motor',
+         'output': 18, 'weight_locus': 60},
+    40: {'input': 10,
+         'mode': 'sensor_to_internal',
+         'output': 14,
          'weight_locus': 61},
-    41: {'input': 13,
+    41: {'input': 10,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 62},
+    42: {'input': 10,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 63},
+    43: {'input': 10,
          'mode': 'sensor_to_motor',
          'output': 18,
-         'weight_locus': 62},
-    42: {'input': 14,
+         'weight_locus': 64},
+    44: {'input': 11,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 65},
+    45: {'input': 11,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 66},
+    46: {'input': 11,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 67},
+    47: {'input': 11,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 68},
+    48: {'input': 12,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 69},
+    49: {'input': 12,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 70},
+    50: {'input': 12,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 71},
+    51: {'input': 12,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 72},
+    52: {'input': 13,
+         'mode': 'sensor_to_internal',
+         'output': 14,
+         'weight_locus': 73},
+    53: {'input': 13,
+         'mode': 'sensor_to_motor',
+         'output': 16,
+         'weight_locus': 74},
+    54: {'input': 13,
+         'mode': 'sensor_to_motor',
+         'output': 17,
+         'weight_locus': 75},
+    55: {'input': 13,
+         'mode': 'sensor_to_motor',
+         'output': 18,
+         'weight_locus': 76},
+    56: {'input': 14,
          'mode': 'internal_to_internal',
          'output': 15,
-         'weight_locus': 63},
-    43: {'input': 14,
+         'weight_locus': 77},
+    57: {'input': 14,
          'mode': 'internal_to_motor',
          'output': 16,
-         'weight_locus': 64},
-    44: {'input': 14,
+         'weight_locus': 78},
+    58: {'input': 14,
          'mode': 'internal_to_motor',
          'output': 17,
-         'weight_locus': 65},
-    45: {'input': 14,
+         'weight_locus': 79},
+    59: {'input': 14,
          'mode': 'internal_to_motor',
          'output': 18,
-         'weight_locus': 66},
-    46: {'input': 15,
+         'weight_locus': 80},
+    60: {'input': 15,
          'mode': 'internal_to_internal',
          'output': 14,
-         'weight_locus': 67},
-    47: {'input': 18,
+         'weight_locus': 81},
+    61: {'input': 18,
          'mode': 'motor_to_sensor',
          'output': 13,
-         'weight_locus': 68}
+         'weight_locus': 82}
     }
-
-default_connections_no_comm_self = {
-    0: {'input': 0,
-        'mode': 'sensor_to_internal',
-        'output': 14,
-        'weight_locus': 21},
-    1: {'input': 0, 'mode': 'sensor_to_motor',
-        'output': 16, 'weight_locus': 22},
-    2: {'input': 0, 'mode': 'sensor_to_motor',
-        'output': 17, 'weight_locus': 23},
-    3: {'input': 1,
-        'mode': 'sensor_to_internal',
-        'output': 14,
-        'weight_locus': 24},
-    4: {'input': 1, 'mode': 'sensor_to_motor',
-        'output': 16, 'weight_locus': 25},
-    5: {'input': 1, 'mode': 'sensor_to_motor',
-        'output': 17, 'weight_locus': 26},
-    6: {'input': 2,
-        'mode': 'sensor_to_internal',
-        'output': 14,
-        'weight_locus': 27},
-    7: {'input': 2, 'mode': 'sensor_to_motor',
-        'output': 16, 'weight_locus': 28},
-    8: {'input': 2, 'mode': 'sensor_to_motor',
-        'output': 17, 'weight_locus': 29},
-    9: {'input': 3,
-        'mode': 'sensor_to_internal',
-        'output': 14,
-        'weight_locus': 30},
-    10: {'input': 3, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 31},
-    11: {'input': 3, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 32},
-    12: {'input': 4,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 33},
-    13: {'input': 4, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 34},
-    14: {'input': 4, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 35},
-    15: {'input': 5,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 36},
-    16: {'input': 5, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 37},
-    17: {'input': 5, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 38},
-    18: {'input': 6,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 39},
-    19: {'input': 6, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 40},
-    20: {'input': 6, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 41},
-    21: {'input': 7,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 42},
-    22: {'input': 7, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 43},
-    23: {'input': 7, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 44},
-    24: {'input': 8,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 45},
-    25: {'input': 8, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 46},
-    26: {'input': 8, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 47},
-    27: {'input': 9,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 48},
-    28: {'input': 9, 'mode': 'sensor_to_motor',
-         'output': 16, 'weight_locus': 49},
-    29: {'input': 9, 'mode': 'sensor_to_motor',
-         'output': 17, 'weight_locus': 50},
-    30: {'input': 10,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 51},
-    31: {'input': 10,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 52},
-    32: {'input': 10,
-         'mode': 'sensor_to_motor',
-         'output': 17,
-         'weight_locus': 53},
-    33: {'input': 11,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 54},
-    34: {'input': 11,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 55},
-    35: {'input': 11,
-         'mode': 'sensor_to_motor',
-         'output': 17,
-         'weight_locus': 56},
-    36: {'input': 12,
-         'mode': 'sensor_to_internal',
-         'output': 14,
-         'weight_locus': 57},
-    37: {'input': 12,
-         'mode': 'sensor_to_motor',
-         'output': 16,
-         'weight_locus': 58},
-    38: {'input': 12,
-         'mode': 'sensor_to_motor',
-         'output': 17,
-         'weight_locus': 59},
-    39: {'input': 14,
-         'mode': 'internal_to_internal',
-         'output': 15,
-         'weight_locus': 60},
-    40: {'input': 14,
-         'mode': 'internal_to_motor',
-         'output': 16,
-         'weight_locus': 61},
-    41: {'input': 14,
-         'mode': 'internal_to_motor',
-         'output': 17,
-         'weight_locus': 62},
-    42: {'input': 14,
-         'mode': 'internal_to_motor',
-         'output': 18,
-         'weight_locus': 63},
-    43: {'input': 15,
-         'mode': 'internal_to_internal',
-         'output': 14,
-         'weight_locus': 64}}
