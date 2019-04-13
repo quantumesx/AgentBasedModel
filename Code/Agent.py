@@ -6,6 +6,7 @@ from Helper import find_dx, find_dy, find_loc, find_ang, norm_ang, get_distance
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle, FancyArrow, Wedge, Ellipse, Rectangle
 import math
+from copy import deepcopy
 
 
 class agent():
@@ -17,8 +18,8 @@ class agent():
                  ir_ang=[90, 45, 0, 0, -45, -90, -180, 180],
                  ir_placement=[60, 36, 12, -12, -36, -60, -156, 156],
                  comm_sensors=[(315, 44), (45, 134), (135, 224), (225, 314)],
-                 # input, hidden, output #
-                 ann=MN_controller(i=14, h=2, o=3, random=True),
+                 test_mode=False,  # if true, generate a random network
+                 comm_self_connected=True,
                  name='nameless_agent',
                  color=(rd.uniform(0, 1), rd.uniform(0, 1), rd.uniform(0, 1))):
         """
@@ -52,16 +53,21 @@ class agent():
         self.comm_sensors = comm_sensors
         self.comm_readings = [0]*len(comm_sensors)
 
-        # set comm_self_reading
-        self.comm_self_reading = 0
-
-        # controller
-        self.ann = ann
-
         # actuators
         self.left_output = 0
         self.right_output = 0
         self.comm_output = 0
+
+        # controller
+        # This doesn't matter in experiment, it's just for test mode
+        # because the trial function will create a controller and assign it
+        # to the agents
+        if test_mode:
+            ann = MN_controller(comm_self_connected=comm_self_connected,
+                                random=True)
+            self.ann = deepcopy(ann)
+        else:
+            self.ann = ''
 
     def randomize_position(self, env):
         """Generate a random position (loc and ang) for the agent."""

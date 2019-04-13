@@ -32,6 +32,7 @@ class trial():
         self.step_fitness = []  # fitness at each timestep
         self.fitness = 0  # total fitness
         self.comm_disabled = comm_disabled
+        self.verbose = verbose
 
         # initialize environment
         self.env = environment(width=env_width, height=env_height,
@@ -48,10 +49,6 @@ class trial():
             agent(name=self.name+'agent3', color='green')
             ]
 
-        # validate the environment
-        if verbose:
-            self.env.show()
-
     def trial_setup(self):
         """Set up initial positions for the agents."""
         def setup_agent(a):
@@ -64,6 +61,9 @@ class trial():
             a.ann = deepcopy(self.ann)
 
         [setup_agent(a) for a in self.env.agents]
+        # validate the environment
+        if self.verbose:
+            self.env.show()
 
     def new_ann(self, controller):
         """Change ann for the trial without having to change anything else."""

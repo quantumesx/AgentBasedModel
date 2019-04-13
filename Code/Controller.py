@@ -27,42 +27,47 @@ class MN_controller():
         # name
         self.name = name
 
+        # condition
+        self.comm_self_connected = comm_self_connected
+
         # initialize nodes
         self.i = i  # number of input nodes
         self.h = h  # number of hidden nodes
         self.o = o  # number of output nodes
 
         # with fixed default network architecture, use this to save time:
-        self.nodes = default_node_list
+        nodes = default_node_list
 
         if comm_self_connected:
             self.genome_size = 69
-            self.connections = default_connections
+            conn = default_connections
         else:
             self.genome_size = 65
-            self.connections = default_connections_no_comm_self
+            conn = default_connections_no_comm_self
 
         # genotype
         if genome:
-            self.genome = genome
+            if len(genome) == self.genome_size:
+                self.genome = genome
+            else:
+                print('Warning: Genome not expected size {}.'.format(
+                    self.genome_size))
+                if len(genome) == 69 and self.genome_size == 65:
+                    print('Corrected.')
+                    self.genome = [genome[i] for i in range(len(genome))
+                                   if i not in comm_self_loci_new]
+                else:
+                    print('Not corrected')
         elif random:
-            self.genome = rd.choices(range(0, 255), k=self.genome_size)
+            print('Warning: generating random network')
+            self.genome = rd.choices(range(0, 256), k=self.genome_size)
         else:
             print('Error: No genome.')
 
-        # In the case of variable network dimensions, use the follow lines
-        # self.nodes = self.generate_node_list()
-        # self.connections = self.generate_connection_list()
-
-        # initialize activations
-        # for n in self.nodes.keys():
-        #    self.nodes[n]['activation'] = []
-        #    self.nodes[n]['activation'].append(0)
-        #    if self.nodes[n]['type'] != 'sensory':
-        #        self.nodes[n]['activation'].append(0)
-
-        # phenotype
-        self.G_to_P()  # get phenotype from genome
+        # get phenotype from genome
+        nodes, conn = G_to_P(self.genome, nodes, conn)
+        self.nodes = nodes
+        self.connections = conn
 
     def generate_node_list(self):
         """Generate list of nodes for MN controller."""
@@ -189,8 +194,9 @@ class MN_controller():
                             n += 1
         return connections
 
+    """
     def G_to_P(self):
-        """Convert genome type to phenotype."""
+        """"""Convert genome type to phenotype.""""""
         for n in self.nodes.keys():
             if 'time_const_locus' in self.nodes[n].keys():
                 self.nodes[n]['time_const'] = normalize(self.genome[
@@ -202,6 +208,8 @@ class MN_controller():
         for c in self.connections.keys():
             self.connections[c]['weight'] = normalize(self.genome[
                 self.connections[c]['weight_locus']])
+            print(self.connections[c]['weight'])
+    """
 
     def sensor_to_motor(self, inputs):
         """
@@ -231,7 +239,7 @@ class MN_controller():
 
         return motor_left, motor_right, comm_unit
 
-    def propagate(self, inputs, comm_unit_weight=False, validate=False):
+    def propagate(self, inputs, validate=False):
         """
         Update activations in nodes.
 
@@ -264,28 +272,30 @@ class MN_controller():
         """
         def get_input_nodes(output_node):
             """Get all input giving nodes for a (internal or motor) node."""
-            index = [d['output'] for d in list(conn.values())]
+            index = [d['output'] for d in list(self.connections.values())]
             indices = [i for i, x in enumerate(index) if x == output_node]
-            input_nodes = [conn[i]['input'] for i in indices]
+            input_nodes = [self.connections[i]['input'] for i in indices]
             return input_nodes
 
         def get_connections(output_node):
-            index = [d['output'] for d in list(conn.values())]
+            index = [d['output'] for d in list(self.connections.values())]
             indices = [i for i, x in enumerate(index) if x == output_node]
             return indices
 
         def get_sensory_activation(n, signal):
             """Get sensor activation, given node # and signal."""
-            time_const = nodes[n]['time_const']  # the node's time constant
-            activation_last = nodes[n]['activation'][-1]  # last time
+            # the node's time constant
+            time_const = self.nodes[n]['time_const']
+            activation_last = self.nodes[n]['activation'][-1]  # last time
             activation = activation_last * time_const \
                 + signal * (1 - time_const)  # sensor node activation func
+
             self.nodes[n]['activation'].append(activation)
 
         def get_weighted_signal(c):
             """Get internal node sum signal, given node #."""
-            input = nodes[conn[c]['input']]['activation'][-1]
-            weight = conn[c]['weight']
+            input = self.nodes[self.connections[c]['input']]['activation'][-1]
+            weight = self.connections[c]['weight']
             return input * weight
 
         def get_internal_activation(n):
@@ -293,9 +303,9 @@ class MN_controller():
             connections = get_connections(n)
             sum_signals = sum([get_weighted_signal(c) for c in connections])
 
-            bias = nodes[n]['bias']
-            time_const = nodes[n]['time_const']
-            a_last = nodes[n]['activation'][-1]
+            bias = self.nodes[n]['bias']
+            time_const = self.nodes[n]['time_const']
+            a_last = self.nodes[n]['activation'][-1]
             a_raw = bias + sum_signals
 
             # activation func for internal nodes
@@ -310,25 +320,22 @@ class MN_controller():
             connections = get_connections(n)
             sum_signals = sum([get_weighted_signal(c) for c in connections])
 
-            bias = nodes[n]['bias']
+            bias = self.nodes[n]['bias']
             a_raw = bias + sum_signals
             activation = 1 / (1 + math.e ** (-a_raw))
 
             # do not activate directly; update all together at the end of func
             return n, activation
 
-        # otherwise variable names are too long
-        nodes = self.nodes
-        conn = self.connections
-
         # get the id # for all the neurons
         comm_self_node = 13
-        other_sensory_nodes = [n for n in nodes.keys()
-                               if nodes[n]['type'] == 'sensory' and n != 13]
-        internal_nodes = [n for n in nodes.keys()
-                          if nodes[n]['type'] == 'internal']
-        motor_nodes = [n for n in nodes.keys()
-                       if nodes[n]['type'] == 'motor']
+        other_sensory_nodes = [n for n in self.nodes.keys()
+                               if self.nodes[n]['type'] == 'sensory'
+                               and n != 13]
+        internal_nodes = [n for n in self.nodes.keys()
+                          if self.nodes[n]['type'] == 'internal']
+        motor_nodes = [n for n in self.nodes.keys()
+                       if self.nodes[n]['type'] == 'motor']
 
         if validate:
             # make sure the # of inputs is correct
@@ -336,14 +343,14 @@ class MN_controller():
                 print('Warning: incorrect input shape')
 
             # make sure the length of activations are as expected
-            a_sensor = [nodes[n]['activation']
+            a_sensor = [self.nodes[n]['activation']
                         for n in other_sensory_nodes]
             len_sensor = [len(l) for l in a_sensor] + 1
 
-            a_internal = [nodes[n]['activation'] for n in internal_nodes]
+            a_internal = [self.nodes[n]['activation'] for n in internal_nodes]
             len_internal = [len(l) for l in a_internal]
 
-            a_motor = [nodes[n]['activation'] for n in motor_nodes]
+            a_motor = [self.nodes[n]['activation'] for n in motor_nodes]
             len_motor = [len(l) for l in a_motor]
 
             s_valid = max(len_sensor) == min(len_sensor)
@@ -362,29 +369,18 @@ class MN_controller():
         [get_sensory_activation(n, inputs[n]) for n in other_sensory_nodes]
 
         # computation for comm_self is different than other sensors
-        comm_self_signal = 0
-        for c in get_input_nodes(comm_self_node):  # there should only be 1
-            if comm_unit_weight:
-                    # method 1: treat comm_unit (t-1)* weight as sensor
-                    # for internal and motors, activation at current
-                    # time step t is already calculated, so t-1 is the
-                    # second to last value.
-                input = nodes[conn[c]['input']]['activation'][-2]
-                weight = conn[c]['weight']
-                comm_self_signal += input * weight
-            else:
-                # method 2: treat comm_unit as sensor (no weight)
-                input = nodes[conn[c]['input']]['activation'][-2]
-                comm_self_signal += input
+
+        comm_unit = 18
+        comm_self_signal = self.nodes[comm_unit]['activation'][-2]
+
         get_sensory_activation(comm_self_node, comm_self_signal)
 
         # Step 2: update internal nodes
-        new_activations = [get_internal_activation(n)
-                           for n in internal_nodes]
+        new_activations = [get_internal_activation(n) for n in internal_nodes]
         new_activations += [get_motor_activation(n) for n in motor_nodes]
 
         for n, a in new_activations:
-            nodes[n]['activation'].append(a)
+            self.nodes[n]['activation'].append(a)
 
     def show(self):
         """Show network plot."""
@@ -439,12 +435,41 @@ class MN_controller():
         ax.figure.set_size_inches(6, 6)
 
 
+def G_to_P(genome, nodes, connections):
+    """Convert genome type to phenotype."""
+    # nodes
+    for n in nodes.keys():
+        if 'time_const_locus' in nodes[n].keys():
+            nodes[n]['time_const'] = normalize(genome[
+                nodes[n]['time_const_locus']], out_min=0, out_max=1)
+        if 'bias_locus' in nodes[n].keys():
+            nodes[n]['bias'] = normalize(genome[
+                nodes[n]['bias_locus']])
+    # connections
+    for c in connections.keys():
+        connections[c]['weight'] = normalize(genome[
+            connections[c]['weight_locus']])
+
+    return nodes, connections
+
+
+def convert_genome(genome):
+    """Convert genome size 69 to genome size 65."""
+    if len(genome) == 69:
+        new_genome = [genome[i] for i in range(len(genome))
+                      if i not in comm_self_loci_new]
+    else:
+        print('Error: genome size is not as expected (69).')
+        new_genome = []
+    return new_genome
+
+
 # loci to get rid of going from size 83 to 69
 extra_loci = [24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 73]
 # loci to get rid of going from size 83 to 65
 comm_self_loci_old = [74, 75, 76, 82]
 # loci to get rid of going from size 69 to 65
-comm_self_loci_new = [39, 40, 41, 47]
+comm_self_loci_new = [60, 61, 62, 68]
 
 default_node_list = {
     0: {'activation': [0],

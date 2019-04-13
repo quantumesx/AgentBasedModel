@@ -73,5 +73,5 @@ def animate(trial, name='unnamed_trial'):
                                    repeat=True)
 
     plt.show()
-    anim.save('Animation/'+name+'.mp4', fps=100, extra_args=['-vcodec',
-                                                             'libx264'])
+    anim.save('Data/Animation/'+name+'.mp4', fps=100, extra_args=['-vcodec',
+                                                                  'libx264'])
