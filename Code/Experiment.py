@@ -250,10 +250,11 @@ class experiment():
                     for r in range(int(rep))]
 
         if gen == self.gen-1:
-            filename = 'Data/{}_{}_{}_Run{}_final.genome'.format(self.today,
-                                                                 self.condition,
-                                                                 self.csc,
-                                                                 self.run_num)
+            filename = 'Data/{}_{}_{}_Run{}_final.genome'.format(
+                self.today,
+                self.condition,
+                self.csc,
+                self.run_num)
             with open(filename, 'w', newline='') as data_file:
                 wr = csv.writer(data_file, quoting=csv.QUOTE_ALL)
                 # write header

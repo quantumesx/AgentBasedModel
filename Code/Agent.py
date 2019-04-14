@@ -127,7 +127,7 @@ class agent():
 
         self.ground_reading = reading
 
-    def get_comm_readings(self, env, verbose=False):
+    def get_comm_readings(self, env, comm_disabled, verbose=False):
         """
         Get comm sensor readings.
 
@@ -139,54 +139,58 @@ class agent():
         Output:
         - list, reading of the 4 comm sensors
         """
-        self.comm_readings = []
+        if comm_disabled:
+            self.comm_readings = [0, 0, 0, 0]
+        else:
+            self.comm_readings = []
 
-        comm = self.comm_sensors
+            comm = self.comm_sensors
 
-        received = [
-            [0],
-            [0],
-            [0],
-            [0]
-        ]
-        for agent in env.agents:
-            # first, check if an agent is within range
-            if agent.name == self.name:
-                pass
-            else:
-                if verbose:
-                    print('current agent:', agent.name)
-                d = get_distance(self.loc, agent.loc)
-                if d <= 100:  # if this is true, then it's within range
-                    # get the signal
-                    signal = agent.comm_output
-                    if verbose:
-                        print('perceived signal:', signal)
-                    # determine which comm sensor receives the signal
-                    diff = norm_ang(find_ang(self.loc, agent.loc) - self.ang)
-
-                    if diff >= comm[0][0] or diff < comm[0][1]:
-                        received[0].append(signal)
-                        if verbose:
-                            print('received by front sensor')
-                    elif diff >= comm[1][0] and diff < comm[1][1]:
-                        received[1].append(signal)
-                        if verbose:
-                            print('received by left sensor')
-                    elif diff >= comm[2][0] and diff < comm[2][1]:
-                        received[2].append(signal)
-                        if verbose:
-                            print('received by rear sensor')
-                    elif diff >= comm[3][0] and diff < comm[3][1]:
-                        received[3].append(signal)
-                        if verbose:
-                            print('received by right sensor')
+            received = [
+                [0],
+                [0],
+                [0],
+                [0]
+            ]
+            for agent in env.agents:
+                # first, check if an agent is within range
+                if agent.name == self.name:
+                    pass
                 else:
                     if verbose:
-                        print('out of detectable range')
+                        print('current agent:', agent.name)
+                    d = get_distance(self.loc, agent.loc)
+                    if d <= 100:  # if this is true, then it's within range
+                        # get the signal
+                        signal = agent.comm_output
+                        if verbose:
+                            print('perceived signal:', signal)
+                        # determine which comm sensor receives the signal
+                        diff = norm_ang(find_ang(self.loc,
+                                                 agent.loc) - self.ang)
 
-        self.comm_readings = [max(received[0]), max(received[1]),
-                              max(received[2]), max(received[3])]
+                        if diff >= comm[0][0] or diff < comm[0][1]:
+                            received[0].append(signal)
+                            if verbose:
+                                print('received by front sensor')
+                        elif diff >= comm[1][0] and diff < comm[1][1]:
+                            received[1].append(signal)
+                            if verbose:
+                                print('received by left sensor')
+                        elif diff >= comm[2][0] and diff < comm[2][1]:
+                            received[2].append(signal)
+                            if verbose:
+                                print('received by rear sensor')
+                        elif diff >= comm[3][0] and diff < comm[3][1]:
+                            received[3].append(signal)
+                            if verbose:
+                                print('received by right sensor')
+                    else:
+                        if verbose:
+                            print('out of detectable range')
+
+            self.comm_readings = [max(received[0]), max(received[1]),
+                                  max(received[2]), max(received[3])]
 
     def get_ir_readings(self, env, verbose=False):
         """Get readings for all IR sensors."""
@@ -430,8 +434,7 @@ class agent():
     def get_output(self):
         """Feed input into the ann controller."""
         # organize inputs
-        inputs = self.ann.input_activation = self.ir_readings + \
-            self.comm_readings + [self.ground_reading]
+        inputs = self.ir_readings + self.comm_readings + [self.ground_reading]
 
         # get outputs
         outputs = self.ann.sensor_to_motor(inputs)

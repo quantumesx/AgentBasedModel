@@ -84,10 +84,7 @@ class trial():
             # first get all sensor data
             a.get_ground_reading(self.env)
             a.get_ir_readings(self.env)
-            if self.comm_disabled:
-                a.comm_readings = [0, 0, 0, 0]
-            else:
-                a.get_comm_readings(self.env)
+            a.get_comm_readings(self.env, comm_disabled=self.comm_disabled)
 
             # then get outputs
             # updates left_output, right_output, comm_output
@@ -98,12 +95,10 @@ class trial():
             # ann controller
             # Update after network propagation in order to save data
             # can change this in the future
-            comm_self_node = 13
-            a.comm_self_reading = a.ann.nodes[comm_self_node]['activation'][-1]
 
             # store current sensor and actuator data
             inputs = a.ir_readings + a.comm_readings + \
-                [a.ground_reading] + [a.comm_self_reading]
+                [a.ground_reading]
             a.input_data.append(inputs)
             outputs = [a.left_output, a.right_output, a.comm_output]
             a.output_data.append(outputs)
