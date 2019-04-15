@@ -6,7 +6,6 @@ Takes 1 input argument: a number designating the current run.
 
 from Experiment import experiment
 from Generate_First_Gen import read_first_gen_files
-import sys
 import pickle
 
 
@@ -14,10 +13,10 @@ pop = 10
 gen = 3
 trial_num = 3
 top = 2
-today = '2019_04_32'
+today = '2019_04_53'
 
 
-run_num = int(sys.argv[1])  # number designating the current run
+run_num = 0  # number designating the current run
 first_gen_file = 'FirstGen/Run{}Pop{}69.txt'.format(run_num, pop)
 first_gen = read_first_gen_files(first_gen_file)
 

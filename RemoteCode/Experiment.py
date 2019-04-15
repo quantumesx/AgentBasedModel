@@ -6,6 +6,7 @@ from Trial import trial
 # from tqdm import tqdm
 import random as rd
 import csv
+from multiprocessing import Pool
 # import pickle
 
 
@@ -120,6 +121,38 @@ class experiment():
         # Generate new generation
         self.get_new_generation(gen)
 
+    def get_genotype_fitness(self):
+        """Get the fitness of a genotype through behavioral trials."""
+        self.trial.run(record=False, save=False)
+        # print(len(self.trial.ann.nodes[15]['activation']),
+        #      len(self.trial.env.agents[0].ann.nodes[15]['activation']),
+        #      len(self.trial.env.agents[0].loc_data))
+        # self.trial.fitness
+        return self.trial.fitness
+
+    def get_all_fitness(self, params):
+        """
+        Get the fitness of an entire generation.
+
+        params = (genome, p)
+        written this way to enable multithreading
+        """
+        genome = params[0]
+        p = params[1]
+
+        print('population: {} / {}'.format(p+1, self.pop))
+        ann = MN_controller(genome, comm_self_connected=self.csc_bool)
+        self.trial.new_ann(ann)
+        # fitness of the trials
+        total_fit = [self.get_genotype_fitness()
+                     for i in range(self.trial_num)]
+
+        # iterate through each trial; default = 20
+        fitness = sum(total_fit) / self.trial_num
+
+        # update both the genome and the fitness to gen_fitness
+        return p, fitness, total_fit
+
     def get_gen_fitness(self, gen):
         """
         Run all trials for a generation.
@@ -131,38 +164,16 @@ class experiment():
         output:
         - gen_fitness: a list of the fitness for every corresponding population
         """
-        def get_genotype_fitness():
-            """Get the fitness of a genotype through behavioral trials."""
-            self.trial.run(record=False, save=False)
-            # print(len(self.trial.ann.nodes[15]['activation']),
-            #      len(self.trial.env.agents[0].ann.nodes[15]['activation']),
-            #      len(self.trial.env.agents[0].loc_data))
-            # self.trial.fitness
-            return self.trial.fitness
-
-        def get_all_fitness(genome, g, p):
-            """Get the fitness of an entire generation."""
-            print('population: {} / {}'.format(p+1, self.pop))
-            ann = MN_controller(genome, comm_self_connected=self.csc_bool)
-            self.trial.new_ann(ann)
-            # fitness of the trials
-            total_fit = [get_genotype_fitness()
-                         for i in range(self.trial_num)]
-
-            # iterate through each trial; default = 20
-            fitness = sum(total_fit) / self.trial_num
-
-            # update both the genome and the fitness to gen_fitness
-            return p, fitness, total_fit
-
         gen_genome = self.genome
 
         # Just to make sure
         if len(gen_genome) != self.pop:
             print('Error: number of genome not equal to number of population.')
 
-        gen_fitness = [get_all_fitness(gen_genome[p], gen, p)
-                       for p in range(self.pop)]
+        p = Pool(20)
+        params = [(gen_genome[p], p) for p in range(self.pop)]
+
+        gen_fitness = p.map(self.get_all_fitness, params)
 
         filename = 'Data/{}_{}_{}_Run{}_Gen{}.dat'.format(self.today,
                                                           self.condition,
@@ -206,19 +217,18 @@ class experiment():
         # update self.top
         self.top = top_genome
 
-    def get_new_generation(self, gen, mutation_rate=0.02):
+    def get_new_generation(self, gen):
         """
         Get population for the new generation.
 
         input:
         - top_genome: n top genome from the last generation
-        - mutation_rate: rate of mutation, default = 0.02
 
         output:
         - next_gen: list of new genome for the next generation.
                     (length = self.pop)
         """
-        def mutate_loc(l, mutation_rate):
+        def mutate_loc(l, mutation_rate=0.02):
             """
             Mutate a location in a genome.
 
@@ -233,9 +243,9 @@ class experiment():
             else:
                 return l
 
-        def mutate_genome(g, mutation_rate):
+        def mutate_genome(g):
             """Mutate a population's genome."""
-            return [mutate_loc(l, mutation_rate) for l in g]
+            return [mutate_loc(l) for l in g]
 
         top_genome = self.top
 
@@ -245,7 +255,7 @@ class experiment():
 
         # for every genotype:
         # outcomes should be g1, g1, g1, ... g2, g2, ....
-        next_gen = [mutate_genome(self.genome[g], mutation_rate)
+        next_gen = [mutate_genome(self.genome[g])
                     for g in top_genome
                     for r in range(int(rep))]
 
