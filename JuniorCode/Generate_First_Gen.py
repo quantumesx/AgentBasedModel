@@ -4,7 +4,7 @@ import random as rd
 from Controller import convert_genome
 
 
-def generate_first_gen(run, pop):
+def generate_first_gen(prefix, run, pop):
     """Generate the first generation genome for n experimental runs."""
     for r in range(run):
         print('Current run:', r)
@@ -15,9 +15,9 @@ def generate_first_gen(run, pop):
         # then generate genome of size 65
         genome_65 = [convert_genome(g) for g in genome_69]
 
-        filename_69 = 'FirstGen/Run{}Pop{}69.txt'.format(r, pop)
+        filename_69 = 'FirstGen/{}Run{}Pop{}69.txt'.format(prefix, r, pop)
         save_first_gen_files(genome_69, filename_69)
-        filename_65 = 'FirstGen/Run{}Pop{}65.txt'.format(r, pop)
+        filename_65 = 'FirstGen/{}Run{}Pop{}65.txt'.format(prefix, r, pop)
         save_first_gen_files(genome_65, filename_65)
 
 

@@ -24,7 +24,7 @@ class experiment():
     - run_num: number of the current run (out of 10)
     - first_gen: the randomly generated first generation of the current
         experimental run
-    - today: today's date (yyyy-mm-dd)
+    - today: a prefix for filenaming; e.g., today's date (yyyy-mm-dd)
     Overview of function order:
     Run()
     -> run the entire experiment and record data

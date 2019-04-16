@@ -2,9 +2,10 @@
 
 import random as rd
 from Controller import convert_genome
+import sys
 
 
-def generate_first_gen(run, pop):
+def generate_first_gen(prefix, run, pop):
     """Generate the first generation genome for n experimental runs."""
     for r in range(run):
         print('Current run:', r)
@@ -15,9 +16,9 @@ def generate_first_gen(run, pop):
         # then generate genome of size 65
         genome_65 = [convert_genome(g) for g in genome_69]
 
-        filename_69 = 'FirstGen/Run{}Pop{}69.txt'.format(r, pop)
+        filename_69 = 'FirstGen/{}Run{}Pop{}69.txt'.format(prefix, r, pop)
         save_first_gen_files(genome_69, filename_69)
-        filename_65 = 'FirstGen/Run{}Pop{}65.txt'.format(r, pop)
+        filename_65 = 'FirstGen/{}Run{}Pop{}65.txt'.format(prefix, r, pop)
         save_first_gen_files(genome_65, filename_65)
 
 
@@ -43,4 +44,10 @@ def read_first_gen_files(filename):
 
 
 if __name__ == '__main__':
-    generate_first_gen(run=3, pop=10)
+
+    # Either change these manually before running the script
+    # Or take system arguments
+    prefix = sys.argv[1]
+    run = int(sys.argv[2])  # number of runs
+    pop = int(sys.argv[3])  # number of genomes in each population
+    generate_first_gen(prefix, run, pop)

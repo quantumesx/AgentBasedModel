@@ -24,7 +24,7 @@ class experiment():
     - run_num: number of the current run (out of 10)
     - first_gen: the randomly generated first generation of the current
         experimental run
-    - today: today's date (yyyy-mm-dd)
+    - today: a prefix for filenaming; e.g., today's date (yyyy-mm-dd)
     Overview of function order:
     Run()
     -> run the entire experiment and record data
@@ -48,7 +48,6 @@ class experiment():
 
     def __init__(self,
                  condition,
-                 comm_self_connected,
                  run_num,
                  first_gen,
                  today,
@@ -62,7 +61,36 @@ class experiment():
                  ):
         """Initialize the experiment."""
         self.today = today
-        self.condition = condition
+        self.data_dir = 'Data/Cond{}Run{}/'.format(condition,
+                                                   run_num)
+
+        if condition == '1':
+            self.condition = 'comm'
+            self.comm_disabled = False
+            self.csc_bool = True
+            self.csc = 'cs_conn'
+            self.genome_size = 69
+        elif condition == '2':
+            self.condition = 'comm'
+            self.comm_disabled = False
+            self.csc_bool = False
+            self.csc = 'cs_disconn'
+            self.genome_size = 65
+        elif condition == '3':
+            self.condition = 'no_comm'
+            self.comm_disabled = True
+            self.csc_bool = True
+            self.csc = 'cs_conn'
+            self.genome_size = 69
+        elif condition == '4':
+            self.condition = 'no_comm'
+            self.comm_disabled = True
+            self.csc_bool = False
+            self.csc = 'cs_disconn'
+            self.genome_size = 65
+        else:
+            print('Error: Please enter valid condition.')
+
         self.run_num = run_num
 
         self.pop = pop  # population size
@@ -71,15 +99,6 @@ class experiment():
         self.trial_num = trial_num  # trial to run for each team of robots
         self.include_top = include_top
 
-        if comm_self_connected:
-            self.csc_bool = True
-            self.csc = 'cs_conn'
-            self.genome_size = 69
-        else:
-            self.csc_bool = False
-            self.csc = 'cs_disconn'
-            self.genome_size = 65
-
         # header for data files
         self.header = make_header(self.genome_size, self.trial_num)
 
@@ -87,19 +106,14 @@ class experiment():
         self.fitness = []  # updates every generation: [[p1, p2, ...]]
         self.top = []
 
-        # this controller is more just a placeholder
-        if condition == 'comm':
-            comm_disabled = False
-        elif condition == 'no_comm':
-            comm_disabled = True
-        else:
-            print('Error: Please enter valid condition.')
+        # initialize genome for first gen
+        self.genome = first_gen
 
         # initialize trial object
         # this ann doesn't matter; a new network will be generated for each pop
-        place_holder_ann = MN_controller(random=True)
-        self.trial = trial(place_holder_ann, comm_disabled=comm_disabled)
-        self.genome = first_gen
+        place_holder_ann = MN_controller(self.genome[0],
+                                         comm_self_connected=self.csc_bool)
+        self.trial = trial(place_holder_ann, comm_disabled=self.comm_disabled)
 
         # self.genome.append(random_first_gen(self.pop, self.genome_size))
 
@@ -140,7 +154,7 @@ class experiment():
         genome = params[0]
         p = params[1]
 
-        print('population: {} / {}'.format(p+1, self.pop))
+        # print('population: {} / {}'.format(p+1, self.pop))
         ann = MN_controller(genome, comm_self_connected=self.csc_bool)
         self.trial.new_ann(ann)
         # fitness of the trials
@@ -175,11 +189,11 @@ class experiment():
 
         gen_fitness = p.map(self.get_all_fitness, params)
 
-        filename = 'Data/{}_{}_{}_Run{}_Gen{}.dat'.format(self.today,
-                                                          self.condition,
-                                                          self.csc,
-                                                          self.run_num,
-                                                          gen)
+        filename = '{}_{}_{}_Run{}_Gen{}.dat'.format(self.today,
+                                                     self.condition,
+                                                     self.csc,
+                                                     self.run_num,
+                                                     gen)
 
         # pop, loci, total fitness, trial fitnesses
         flat_data = [
@@ -187,7 +201,7 @@ class experiment():
             for p in range(len(gen_fitness))
             ]
 
-        with open(filename, 'w', newline='') as data_file:
+        with open(self.data_dir+filename, 'w', newline='') as data_file:
             wr = csv.writer(data_file, quoting=csv.QUOTE_ALL)
 
             wr.writerow(self.header)
@@ -260,12 +274,12 @@ class experiment():
                     for r in range(int(rep))]
 
         if gen == self.gen-1:
-            filename = 'Data/{}_{}_{}_Run{}_final.genome'.format(
+            filename = '{}_{}_{}_Run{}_final.genome'.format(
                 self.today,
                 self.condition,
                 self.csc,
                 self.run_num)
-            with open(filename, 'w', newline='') as data_file:
+            with open(self.data_dir+filename, 'w', newline='') as data_file:
                 wr = csv.writer(data_file, quoting=csv.QUOTE_ALL)
                 # write header
                 tail = self.trial_num + 1
