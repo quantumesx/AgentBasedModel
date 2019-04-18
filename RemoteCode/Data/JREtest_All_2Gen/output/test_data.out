@@ -1,0 +1,5 @@
+go to Data directory
+make data directory
+set home directory
+condition = 1
+run = 0, test data storage

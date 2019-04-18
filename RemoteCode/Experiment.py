@@ -184,10 +184,14 @@ class experiment():
         if len(gen_genome) != self.pop:
             print('Error: number of genome not equal to number of population.')
 
-        p = Pool(20)
         params = [(gen_genome[p], p) for p in range(self.pop)]
 
+        p = Pool(24)
+
         gen_fitness = p.map(self.get_all_fitness, params)
+
+        p.close()
+        p.join()
 
         filename = '{}_{}_{}_Run{}_Gen{}.dat'.format(self.today,
                                                      self.condition,

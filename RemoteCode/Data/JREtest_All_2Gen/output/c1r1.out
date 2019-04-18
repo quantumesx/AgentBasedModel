@@ -1,0 +1,9 @@
+make data directory
+make data directory
+mkdir: cannot create directory 'Cond1Run1': File exists
+set home directory
+start: condition = 1, run = 1
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+srun: got SIGCONT
+slurmstepd-node1: error: *** JOB 5650 ON node1 CANCELLED AT 2019-04-16T20:06:41 ***
+srun: forcing job termination
